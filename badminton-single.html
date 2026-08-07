@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>羽毛球双打轮转</title>
+  <style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f4f6f8; color: #222; max-width: 480px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 22px; text-align: center; margin: 12px 0; }
+h2 { font-size: 16px; margin: 10px 0 6px; }
+.hint { color: #888; font-size: 13px; text-align: center; margin-bottom: 14px; }
+.view { display: block; }
+.view[hidden] { display: none !important; }
+.group-box { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.name-inputs input { width: 100%; height: 44px; font-size: 16px; border: 1px solid #ddd; border-radius: 8px; padding: 0 12px; margin-bottom: 8px; }
+.btn { height: 44px; border: none; border-radius: 10px; font-size: 16px; cursor: pointer; width: 100%; margin-top: 8px; }
+.btn.primary { background: #07c160; color: #fff; }
+.btn.ghost { background: #fff; color: #555; border: 1px solid #ddd; }
+.btn.big { height: 50px; font-size: 17px; }
+.btn.tiny { width: auto; height: 30px; font-size: 13px; margin: 0; padding: 0 10px; }
+.round-select { display: flex; gap: 8px; flex-wrap: wrap; }
+.round-select label { flex: 1; min-width: 64px; text-align: center; }
+.round-select input { display: none; }
+.round-select input:checked + span { background: #07c160; color: #fff; border-color: #07c160; }
+.round-select span { display: block; padding: 10px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 15px; background: #fff; color: #555; cursor: pointer; }
+.error { color: #e64340; font-size: 14px; text-align: center; margin: 8px 0; }
+.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 15px; color: #555; }
+.match-card { background: #fff; border-radius: 14px; padding: 18px 12px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.match-card .team { font-size: 20px; font-weight: 600; margin: 10px 0; }
+.match-card .rest { color: #999; font-size: 13px; margin-top: 10px; }
+.score-row { display: flex; justify-content: center; align-items: center; margin: 16px 0; }
+.score-col { text-align: center; }
+.score-col .team-label { display: block; font-size: 14px; color: #555; margin-bottom: 6px; max-width: 120px; }
+.score-input { width: 88px; height: 56px; font-size: 28px; text-align: center; border: 1px solid #ddd; border-radius: 10px; }
+.vs { font-size: 24px; color: #999; margin: 0 18px; }
+.preview { background: #fff; border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
+.preview summary { cursor: pointer; color: #555; }
+.preview .item { padding: 6px 0; border-bottom: 1px dashed #eee; color: #666; }
+.standings { list-style: none; counter-reset: rank; background: #fff; border-radius: 14px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.standings li { display: flex; justify-content: space-between; padding: 12px 8px; border-bottom: 1px solid #f0f0f0; font-size: 16px; }
+.standings li:last-child { border-bottom: none; }
+.standings li.champion { background: #fff7e6; border-radius: 8px; font-weight: 700; }
+.standings .meta { color: #999; font-size: 13px; }
+#share-image-wrap { text-align: center; margin-top: 12px; }
+#share-image-wrap img { max-width: 100%; border-radius: 10px; }
+.result-actions { display: flex; gap: 10px; }
+.result-actions .btn { flex: 1; }
+#toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff; padding: 10px 18px; border-radius: 20px; font-size: 14px; z-index: 99; display: none; }
+
+</style>
+</head>
+<body>
+  <!-- ① 设置页 -->
+  <section id="view-setup" class="view" data-view="setup">
+    <h1>🏸 羽毛球双打轮转</h1>
+    <p class="hint">组内按实力从强到弱填写，强组 2~4 人、弱组 2~4 人，总共 6 人</p>
+    <div class="group-box">
+      <h2>强组</h2>
+      <div id="strong-inputs" class="name-inputs"></div>
+      <button type="button" class="btn ghost" id="btn-add-strong">+ 添加强组队员</button>
+    </div>
+    <div class="group-box">
+      <h2>弱组</h2>
+      <div id="weak-inputs" class="name-inputs"></div>
+      <button type="button" class="btn ghost" id="btn-add-weak">+ 添加弱组队员</button>
+    </div>
+    <div class="group-box">
+      <h2>场数</h2>
+      <div class="round-select">
+        <label><input type="radio" name="matchCount" value="12" checked><span>12 场</span></label>
+        <label><input type="radio" name="matchCount" value="15"><span>15 场</span></label>
+        <label><input type="radio" name="matchCount" value="18"><span>18 场</span></label>
+        <label><input type="radio" name="matchCount" value="21"><span>21 场</span></label>
+      </div>
+    </div>
+    <p id="setup-error" class="error" hidden></p>
+    <button type="button" class="btn primary big" id="btn-generate">生成轮转表</button>
+  </section>
+
+  <!-- ② 轮转表页 -->
+  <section id="view-match" class="view" data-view="match" hidden>
+    <div class="topbar">
+      <span id="match-progress">第 1/3 场</span>
+      <button type="button" class="btn tiny" id="btn-standings">排名</button>
+    </div>
+    <div id="current-match" class="match-card"></div>
+    <div class="score-row">
+      <div class="score-col">
+        <span id="score-a-label" class="team-label"></span>
+        <input type="number" id="score-a" class="score-input" min="0" max="99" step="1" inputmode="numeric" placeholder="0">
+      </div>
+      <span class="vs">:</span>
+      <div class="score-col">
+        <span id="score-b-label" class="team-label"></span>
+        <input type="number" id="score-b" class="score-input" min="0" max="99" step="1" inputmode="numeric" placeholder="0">
+      </div>
+    </div>
+    <p id="score-error" class="error" hidden></p>
+    <button type="button" class="btn primary big" id="btn-submit-score">提交比分</button>
+    <button type="button" class="btn ghost" id="btn-finish-early">提前结束</button>
+    <details class="preview">
+      <summary>后续场次预览</summary>
+      <div id="later-matches"></div>
+    </details>
+  </section>
+
+  <!-- ③ 结果页 -->
+  <section id="view-result" class="view" data-view="result" hidden>
+    <h1 id="result-title">🏆 积分排名</h1>
+    <ol id="standings-list" class="standings"></ol>
+    <button type="button" class="btn primary big" id="btn-share-image">生成排名图</button>
+    <button type="button" class="btn ghost" id="btn-copy-text">复制排名文字</button>
+    <div id="share-image-wrap"></div>
+    <div class="result-actions">
+      <button type="button" class="btn ghost" id="btn-rematch">再来一局</button>
+      <button type="button" class="btn ghost" id="btn-reshuffle">重新轮转</button>
+    </div>
+  </section>
+
+  <script>
+/* 轮转算法：生成 N 场双打对阵表（候选池贪心，纯函数，UMD 导出）
+ * 候选池：C(6,4)=15 种人选 × 3 种配对 = 45 种对阵（3v3 时为 27 种）。
+ * 每轮按评分选最优：上场均衡(权重100) > 对阵未用过(+50) > 搭档分散(-2) > 强弱搭配(+10)。
+ * 硬约束：每人上场 ≤ ceil(2N/3)（N 被 3 整除时每人恰好 2N/3 场）。
+ */
+(function (global) {
+  'use strict';
+
+  function player(name, group) { return { name: name, group: group }; }
+
+  function invalid(total, nS, nW, n) {
+    if (total !== 6) return '总人数必须为 6（当前 ' + total + ' 人）';
+    if (nS < 2 || nS > 4) return '强组需 2~4 人（当前 ' + nS + ' 人）';
+    if (nW < 2 || nW > 4) return '弱组需 2~4 人（当前 ' + nW + ' 人）';
+    if (typeof n !== 'number' || n % 1 !== 0 || n < 3 || n > 30) return '场数需为 3~30 的整数';
+    return null;
+  }
+
+  function generateSchedule(strongNames, weakNames, numMatches) {
+    var n = typeof numMatches === 'number' ? numMatches : 12; // 默认 12 场
+    var S = strongNames.slice();
+    var W = weakNames.slice();
+    var err = invalid(S.length + W.length, S.length, W.length, n);
+    if (err) throw new Error(err);
+
+    var s = S.map(function (nm) { return player(nm, 's'); });
+    var w = W.map(function (nm) { return player(nm, 'w'); });
+    var all = s.concat(w);
+
+    // ---- 候选池：全部 4 人组合 × 3 种配对 ----
+    var candidates = [];
+    for (var a = 0; a < all.length; a++) {
+      for (var b = a + 1; b < all.length; b++) {
+        for (var c = b + 1; c < all.length; c++) {
+          for (var d = c + 1; d < all.length; d++) {
+            var chosen = [all[a], all[b], all[c], all[d]];
+            for (var x = 0; x < 4; x++) {
+              for (var y = x + 1; y < 4; y++) {
+                var teamA = [chosen[x], chosen[y]];
+                var teamB = chosen.filter(function (p) { return p !== chosen[x] && p !== chosen[y]; });
+                var resting = all.filter(function (p) { return chosen.indexOf(p) === -1; });
+                candidates.push({ teamA: teamA, teamB: teamB, resting: resting, players: chosen });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    function key2(t) { return [t[0].name, t[1].name].sort().join('+'); }
+    function key4(teamA, teamB) {
+      var a = teamA.map(function (p) { return p.name; }).sort().join('+');
+      var b = teamB.map(function (p) { return p.name; }).sort().join('+');
+      return [a, b].sort().join('|');
+    }
+    function countIn(team, group) {
+      var c = 0;
+      team.forEach(function (p) { if (p.group === group) c++; });
+      return c;
+    }
+
+    // 对称（3v3）时硬约束：人选 2强2弱 且两队各 1强1弱（候选池过滤）
+    var pool = candidates;
+    if (s.length === w.length) {
+      pool = candidates.filter(function (cand) {
+        var ns = 0;
+        cand.players.forEach(function (p) { if (p.group === 's') ns++; });
+        return ns === 2 &&
+          countIn(cand.teamA, 's') === 1 && countIn(cand.teamA, 'w') === 1 &&
+          countIn(cand.teamB, 's') === 1 && countIn(cand.teamB, 'w') === 1;
+      });
+    }
+
+    // ---- 状态 ----
+    var played = {};
+    all.forEach(function (p) { played[p.name] = 0; });
+    var partnerCount = {};
+    var opponentUsed = {};
+    var limit = Math.ceil((2 * n) / 3); // 每人上场上限（n 被 3 整除时 = 2n/3）
+
+    function maxDiff() {
+      var max = -1, min = 1e9;
+      all.forEach(function (p) {
+        var v = played[p.name];
+        if (v > max) max = v;
+        if (v < min) min = v;
+      });
+      return max - min;
+    }
+
+    var schedule = [];
+    for (var i = 1; i <= n; i++) {
+      var best = null;
+      var bestScore = -Infinity;
+      for (var ci = 0; ci < pool.length; ci++) {
+        var cand = pool[ci];
+        // 硬约束：上场数达上限的人不能再选
+        var over = false;
+        for (var pi = 0; pi < cand.players.length; pi++) {
+          if (played[cand.players[pi].name] >= limit) { over = true; break; }
+        }
+        if (over) continue;
+
+        // 模拟选后全局均衡（含休息者）
+        var newMax = -1, newMin = 1e9;
+        all.forEach(function (p) {
+          var v = played[p.name] + (cand.players.indexOf(p) !== -1 ? 1 : 0);
+          if (v > newMax) newMax = v;
+          if (v < newMin) newMin = v;
+        });
+        var score = -(newMax - newMin) * 100;          // 均衡（优先）
+        if (!opponentUsed[key4(cand.teamA, cand.teamB)]) score += 50; // 对阵未用过
+        score -= (partnerCount[key2(cand.teamA)] || 0) * 2;
+        score -= (partnerCount[key2(cand.teamB)] || 0) * 2;           // 搭档分散
+        [cand.teamA, cand.teamB].forEach(function (t) {
+          if (countIn(t, 's') === 1 && countIn(t, 'w') === 1) score += 10; // 强弱搭配偏好（不对称场景）
+        });
+
+        if (score > bestScore) { bestScore = score; best = cand; }
+      }
+      if (!best) break; // 理论不会发生（候选池足够大）
+
+      // 更新状态
+      best.players.forEach(function (p) { played[p.name] += 1; });
+      partnerCount[key2(best.teamA)] = (partnerCount[key2(best.teamA)] || 0) + 1;
+      partnerCount[key2(best.teamB)] = (partnerCount[key2(best.teamB)] || 0) + 1;
+      opponentUsed[key4(best.teamA, best.teamB)] = true;
+
+      schedule.push({
+        id: i,
+        teamA: best.teamA,
+        teamB: best.teamB,
+        resting: best.resting,
+        result: null
+      });
+    }
+    return schedule;
+  }
+
+  var Rotation = { generateSchedule: generateSchedule };
+  if (typeof module !== 'undefined' && module.exports) { module.exports = Rotation; }
+  else { global.BadRot = global.BadRot || {}; global.BadRot.rotation = Rotation; }
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+  <script>
+/* 积分排名：输入名单与场次结果，输出排序后的个人统计（纯函数，UMD 导出） */
+(function (global) {
+  'use strict';
+
+  function getMatchWinner(match) {
+    if (!match || !match.result) return null;
+    if (match.result.scoreA > match.result.scoreB) return 'A';
+    if (match.result.scoreB > match.result.scoreA) return 'B';
+    return null; // 平局（正常不会出现，前端已拦截）
+  }
+
+  function isComplete(schedule) {
+    return schedule.every(function (m) { return !!m.result; });
+  }
+
+  function computeStandings(strongNames, weakNames, schedule) {
+    var players = [];
+    function ensure(name, group) {
+      var p = null;
+      for (var i = 0; i < players.length; i++) {
+        if (players[i].name === name) { p = players[i]; break; }
+      }
+      if (!p) {
+        p = { name: name, group: group, played: 0, wins: 0, points: 0, scored: 0, conceded: 0, net: 0 };
+        players.push(p);
+      }
+      return p;
+    }
+    strongNames.forEach(function (n) { ensure(n, 's'); });
+    weakNames.forEach(function (n) { ensure(n, 'w'); });
+
+    schedule.forEach(function (m) {
+      var winner = getMatchWinner(m);
+      if (!winner) return;
+      var sides = { A: m.teamA, B: m.teamB };
+      sides.A.concat(sides.B).forEach(function (p) {
+        var rec = ensure(p.name, p.group);
+        var onA = sides.A.indexOf(p) !== -1;
+        rec.played += 1;
+        if (onA) {
+          rec.scored += m.result.scoreA;
+          rec.conceded += m.result.scoreB;
+        } else {
+          rec.scored += m.result.scoreB;
+          rec.conceded += m.result.scoreA;
+        }
+        if ((onA && winner === 'A') || (!onA && winner === 'B')) {
+          rec.wins += 1;
+          rec.points += 2;
+        }
+      });
+    });
+
+    players.forEach(function (p) { p.net = p.scored - p.conceded; });
+
+    players.sort(function (a, b) {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.net !== a.net) return b.net - a.net;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      return a.name.localeCompare(b.name, 'zh');
+    });
+    return players;
+  }
+
+  var Ranking = {
+    computeStandings: computeStandings,
+    getMatchWinner: getMatchWinner,
+    isComplete: isComplete
+  };
+  if (typeof module !== 'undefined' && module.exports) { module.exports = Ranking; }
+  else { global.BadRot = global.BadRot || {}; global.BadRot.ranking = Ranking; }
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+  <script>
+/* localStorage 封装（UMD 导出），键名集中定义 */
+(function (global) {
+  'use strict';
+
+  var KEY = 'badminton_activity';
+  var impl = null; // 运行时注入（浏览器用 window.localStorage，测试用 mock）
+
+  function storage() {
+    if (impl) return impl;
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+    return null;
+  }
+
+  function save(activity) {
+    var s = storage();
+    if (!s) return;
+    s.setItem(KEY, JSON.stringify(activity));
+  }
+
+  function isValid(activity) {
+    if (!activity || !Array.isArray(activity.schedule)) return false;
+    if (activity.schedule.length < 3) return false;
+    return activity.schedule.every(function (m) {
+      return m &&
+        Array.isArray(m.teamA) && m.teamA.length === 2 &&
+        Array.isArray(m.teamB) && m.teamB.length === 2 &&
+        Array.isArray(m.resting);
+    });
+  }
+
+  function load() {
+    var s = storage();
+    if (!s) return null;
+    var raw = s.getItem(KEY);
+    if (!raw) return null;
+    try {
+      var data = JSON.parse(raw);
+      if (!isValid(data)) { s.removeItem(KEY); return null; } // 结构坏数据静默清除
+      return data;
+    } catch (e) {
+      s.removeItem(KEY); // 语法坏数据静默清除
+      return null;
+    }
+  }
+
+  function clear() {
+    var s = storage();
+    if (s) s.removeItem(KEY);
+  }
+
+  function setImpl(mock) { impl = mock; }
+
+  var Storage = { KEY: KEY, save: save, load: load, clear: clear, _setImpl: setImpl };
+  if (typeof module !== 'undefined' && module.exports) { module.exports = Storage; }
+  else { global.BadRot = global.BadRot || {}; global.BadRot.storage = Storage; }
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+  <script>
+/* 排名图生成（Canvas）与排名文字（浏览器专用） */
+(function (global) {
+  'use strict';
+
+  function rankingText(standings) {
+    var lines = ['🏸 羽毛球双打积分排名'];
+    standings.forEach(function (r, i) {
+      lines.push((i + 1) + '. ' + r.name + '  ' + r.points + '分（' + r.wins + '胜' + r.played + '场，净胜' + (r.net >= 0 ? '+' : '') + r.net + '）');
+    });
+    return lines.join('\n');
+  }
+
+  function renderRankingImage(standings, containerEl) {
+    var W = 750, H = 120 + standings.length * 88;
+    var dpr = window.devicePixelRatio || 1;
+    var canvas = document.createElement('canvas');
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // 背景
+    ctx.fillStyle = '#f4f6f8';
+    ctx.fillRect(0, 0, W, H);
+
+    // 标题
+    ctx.fillStyle = '#222';
+    ctx.font = 'bold 44px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🏸 羽毛球双打积分排名', W / 2, 80);
+
+    // 每行
+    var y = 140;
+    standings.forEach(function (r, i) {
+      ctx.fillStyle = i === 0 ? '#fff7e6' : '#ffffff';
+      ctx.fillRect(30, y - 48, W - 60, 72);
+      ctx.strokeStyle = '#eee';
+      ctx.strokeRect(30, y - 48, W - 60, 72);
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = i === 0 ? '#d48806' : '#666';
+      ctx.font = 'bold 36px sans-serif';
+      ctx.fillText((i === 0 ? '🏆 ' : '') + (i + 1) + '. ' + r.name, 60, y);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 34px sans-serif';
+      ctx.fillText(r.points + ' 分', W - 60, y);
+
+      ctx.fillStyle = '#999';
+      ctx.font = '26px sans-serif';
+      ctx.fillText(r.wins + '胜 · 净胜' + (r.net >= 0 ? '+' : '') + r.net, W - 60, y + 34);
+
+      y += 88;
+    });
+
+    // 日期
+    var d = new Date();
+    ctx.fillStyle = '#aaa';
+    ctx.font = '26px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(), W / 2, H - 40);
+
+    var img = document.createElement('img');
+    img.src = canvas.toDataURL('image/png');
+    containerEl.innerHTML = '';
+    containerEl.appendChild(img);
+    return canvas;
+  }
+
+  var Share = { rankingText: rankingText, renderRankingImage: renderRankingImage };
+  global.BadRot = global.BadRot || {};
+  global.BadRot.share = Share;
+})(window);
+
+</script>
+  <script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  var activity = null; // { strong, weak, schedule, currentIndex }
+
+  /* ---------- 视图切换 ---------- */
+  function showView(name) {
+    var views = document.querySelectorAll('.view');
+    for (var i = 0; i < views.length; i++) {
+      views[i].hidden = views[i].getAttribute('data-view') !== name;
+    }
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- 设置页 ---------- */
+  function defaultInputs() {
+    return ['', '', ''];
+  }
+  function buildNameInputs(containerId, values, addBtnId) {
+    var container = $(containerId);
+    container.innerHTML = '';
+    values.forEach(function (v) {
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 8;
+      input.placeholder = '姓名';
+      input.value = v;
+      container.appendChild(input);
+    });
+    $(addBtnId).addEventListener('click', function () {
+      if (container.children.length >= 4) { toast('最多 4 人'); return; }
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 8;
+      input.placeholder = '姓名';
+      container.appendChild(input);
+      input.focus();
+    });
+  }
+
+  function collectNames(containerId) {
+    var out = [];
+    var inputs = $(containerId).querySelectorAll('input');
+    for (var i = 0; i < inputs.length; i++) {
+      var v = inputs[i].value.trim();
+      if (v) out.push(v);
+    }
+    return out;
+  }
+
+  function hasDuplicates(arr) {
+    for (var i = 0; i < arr.length; i++) {
+      for (var j = i + 1; j < arr.length; j++) {
+        if (arr[i] === arr[j]) return true;
+      }
+    }
+    return false;
+  }
+
+  function validateSetup(strong, weak) {
+    var all = strong.concat(weak);
+    if (hasDuplicates(all)) return '姓名不能重复';
+    if (all.length !== 6) return '总共需要 6 人（当前 ' + all.length + ' 人）';
+    if (strong.length < 2 || strong.length > 4) return '强组需 2~4 人（当前 ' + strong.length + ' 人）';
+    if (weak.length < 2 || weak.length > 4) return '弱组需 2~4 人（当前 ' + weak.length + ' 人）';
+    return null;
+  }
+
+  function onGenerate() {
+    var strong = collectNames('strong-inputs');
+    var weak = collectNames('weak-inputs');
+    var err = validateSetup(strong, weak);
+    if (err) { showError(err); return; }
+    clearError();
+    var countEl = document.querySelector('input[name="matchCount"]:checked');
+    var numMatches = countEl ? parseInt(countEl.value, 10) : 12;
+    activity = {
+      strong: strong,
+      weak: weak,
+      schedule: BadRot.rotation.generateSchedule(strong, weak, numMatches),
+      currentIndex: 0
+    };
+    BadRot.storage.save(activity);
+    renderMatchView();
+    showView('match');
+  }
+
+  function showError(msg) {
+    var el = $('setup-error');
+    el.textContent = msg;
+    el.hidden = false;
+  }
+  function clearError() { $('setup-error').hidden = true; }
+
+  function toast(msg) {
+    var el = document.getElementById('toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.display = 'block';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.style.display = 'none'; }, 1800);
+  }
+
+  /* ---------- 轮转表页 ---------- */
+  function teamLabel(team) {
+    return team.map(function (p) { return (p.group === 's' ? '💪' : '') + p.name; }).join(' + ');
+  }
+
+  function renderMatchView() {
+    var m = activity.schedule[activity.currentIndex];
+    var progress = '第 ' + (activity.currentIndex + 1) + '/' + activity.schedule.length + ' 场';
+    $('match-progress').textContent = progress;
+
+    var card = $('current-match');
+    card.innerHTML =
+      '<div class="team">' + teamLabel(m.teamA) + '</div>' +
+      '<div style="color:#999">VS</div>' +
+      '<div class="team">' + teamLabel(m.teamB) + '</div>' +
+      '<div class="rest">本场休息：' + m.resting.map(function (p) { return p.name; }).join('、') + '</div>';
+
+    $('score-a-label').textContent = teamLabel(m.teamA);
+    $('score-b-label').textContent = teamLabel(m.teamB);
+
+    // 已打过（修改比分场景）
+    var scoreA = $('score-a'), scoreB = $('score-b');
+    scoreA.value = m.result ? m.result.scoreA : '';
+    scoreB.value = m.result ? m.result.scoreB : '';
+
+    // 后续场次预览
+    var later = $('later-matches');
+    later.innerHTML = '';
+    for (var i = activity.currentIndex + 1; i < activity.schedule.length; i++) {
+      var lm = activity.schedule[i];
+      var item = document.createElement('div');
+      item.className = 'item';
+      item.textContent = '第 ' + (i + 1) + ' 场：' + teamLabel(lm.teamA) + ' vs ' + teamLabel(lm.teamB);
+      later.appendChild(item);
+    }
+    $('score-error').hidden = true;
+  }
+
+  function onSubmitScore() {
+    var rawA = $('score-a').value.trim();
+    var rawB = $('score-b').value.trim();
+    var a = parseInt(rawA, 10);
+    var b = parseInt(rawB, 10);
+    var err = $('score-error');
+    if (rawA === '' || rawB === '' || isNaN(a) || isNaN(b) ||
+        a < 0 || a > 99 || b < 0 || b > 99 ||
+        String(a) !== rawA || String(b) !== rawB) {
+      err.textContent = '请输入 0~99 的整数比分';
+      err.hidden = false; return;
+    }
+    if (a === b) {
+      err.textContent = '两队比分不能相同，请确认胜者';
+      err.hidden = false; return;
+    }
+    err.hidden = true;
+    var m = activity.schedule[activity.currentIndex];
+    m.result = { scoreA: a, scoreB: b };
+    BadRot.storage.save(activity);
+
+    if (activity.currentIndex + 1 >= activity.schedule.length) {
+      renderResultView();
+      showView('result');
+    } else {
+      activity.currentIndex += 1;
+      BadRot.storage.save(activity);
+      renderMatchView();
+    }
+  }
+
+  function onFinishEarly() {
+    renderResultView();
+    showView('result');
+  }
+
+  function onShowStandings() {
+    renderResultView();
+    showView('result');
+  }
+
+  /* ---------- 结果页 ---------- */
+  function renderResultView() {
+    var standings = BadRot.ranking.computeStandings(activity.strong, activity.weak, activity.schedule);
+    var finished = BadRot.ranking.isComplete(activity.schedule);
+    $('result-title').textContent = finished ? '🏆 积分排名（完赛）' : '📊 当前排名（未完赛）';
+
+    var list = $('standings-list');
+    list.innerHTML = '';
+    standings.forEach(function (r, i) {
+      var li = document.createElement('li');
+      if (i === 0 && finished) li.className = 'champion';
+      var left = document.createElement('span');
+      left.textContent = (i === 0 && finished ? '🏆 ' : '') + (i + 1) + '. ' + r.name;
+      var meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = r.points + '分 · ' + r.wins + '胜' + r.played + '场 · 净胜' + (r.net >= 0 ? '+' : '') + r.net;
+      li.appendChild(left);
+      li.appendChild(meta);
+      list.appendChild(li);
+    });
+    $('share-image-wrap').innerHTML = '';
+  }
+
+  function onShareImage() {
+    var standings = BadRot.ranking.computeStandings(activity.strong, activity.weak, activity.schedule);
+    BadRot.share.renderRankingImage(standings, $('share-image-wrap'));
+    toast('图片已生成，长按图片保存或发送到微信群');
+  }
+
+  function onCopyText() {
+    var standings = BadRot.ranking.computeStandings(activity.strong, activity.weak, activity.schedule);
+    var text = BadRot.share.rankingText(standings);
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); toast('排名文字已复制'); }
+    catch (e) { toast('复制失败，请手动复制'); }
+    document.body.removeChild(ta);
+  }
+
+  function onRematch() {
+    BadRot.storage.clear();
+    activity = null;
+    buildNameInputs('strong-inputs', defaultInputs(), 'btn-add-strong');
+    buildNameInputs('weak-inputs', defaultInputs(), 'btn-add-weak');
+    clearError();
+    showView('setup');
+  }
+
+  function onReshuffle() {
+    activity.schedule = BadRot.rotation.generateSchedule(activity.strong, activity.weak, activity.schedule.length);
+    activity.currentIndex = 0;
+    BadRot.storage.save(activity);
+    renderMatchView();
+    showView('match');
+  }
+
+  /* ---------- 启动 ---------- */
+  function init() {
+    buildNameInputs('strong-inputs', defaultInputs(), 'btn-add-strong');
+    buildNameInputs('weak-inputs', defaultInputs(), 'btn-add-weak');
+    $('btn-generate').addEventListener('click', onGenerate);
+    $('btn-submit-score').addEventListener('click', onSubmitScore);
+    $('btn-finish-early').addEventListener('click', onFinishEarly);
+    $('btn-standings').addEventListener('click', onShowStandings);
+    $('btn-share-image').addEventListener('click', onShareImage);
+    $('btn-copy-text').addEventListener('click', onCopyText);
+    $('btn-rematch').addEventListener('click', onRematch);
+    $('btn-reshuffle').addEventListener('click', onReshuffle);
+
+    var saved = BadRot.storage.load();
+    if (saved && saved.schedule && saved.schedule.length === 3) {
+      activity = saved;
+      if (BadRot.ranking.isComplete(activity.schedule)) { renderResultView(); showView('result'); }
+      else { renderMatchView(); showView('match'); }
+    } else {
+      showView('setup');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+  window.BadRot = window.BadRot || {};
+  window.BadRot.app = { getActivity: function () { return activity; } };
+})();
+
+</script>
+</body>
+</html>
