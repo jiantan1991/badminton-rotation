@@ -73,10 +73,12 @@
     var err = validateSetup(strong, weak);
     if (err) { showError(err); return; }
     clearError();
+    var countEl = document.querySelector('input[name="matchCount"]:checked');
+    var numMatches = countEl ? parseInt(countEl.value, 10) : 12;
     activity = {
       strong: strong,
       weak: weak,
-      schedule: BadRot.rotation.generateSchedule(strong, weak),
+      schedule: BadRot.rotation.generateSchedule(strong, weak, numMatches),
       currentIndex: 0
     };
     BadRot.storage.save(activity);
@@ -234,7 +236,7 @@
   }
 
   function onReshuffle() {
-    activity.schedule = BadRot.rotation.generateSchedule(activity.strong, activity.weak);
+    activity.schedule = BadRot.rotation.generateSchedule(activity.strong, activity.weak, activity.schedule.length);
     activity.currentIndex = 0;
     BadRot.storage.save(activity);
     renderMatchView();

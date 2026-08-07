@@ -19,7 +19,7 @@
 
   function isValid(activity) {
     if (!activity || !Array.isArray(activity.schedule)) return false;
-    if (activity.schedule.length !== 3) return false;
+    if (activity.schedule.length < 3) return false;
     return activity.schedule.every(function (m) {
       return m &&
         Array.isArray(m.teamA) && m.teamA.length === 2 &&
