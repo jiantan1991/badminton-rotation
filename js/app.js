@@ -179,8 +179,63 @@
     showView('result');
   }
 
-  /* ---------- 后续任务填充的渲染函数（先占位避免报错） ---------- */
-  function renderResultView() {}
+  /* ---------- 结果页 ---------- */
+  function renderResultView() {
+    var standings = BadRot.ranking.computeStandings(activity.strong, activity.weak, activity.schedule);
+    var finished = BadRot.ranking.isComplete(activity.schedule);
+    $('result-title').textContent = finished ? '🏆 积分排名（完赛）' : '📊 当前排名（未完赛）';
+
+    var list = $('standings-list');
+    list.innerHTML = '';
+    standings.forEach(function (r, i) {
+      var li = document.createElement('li');
+      if (i === 0 && finished) li.className = 'champion';
+      var left = document.createElement('span');
+      left.textContent = (i === 0 && finished ? '🏆 ' : '') + (i + 1) + '. ' + r.name;
+      var meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = r.points + '分 · ' + r.wins + '胜' + r.played + '场 · 净胜' + (r.net >= 0 ? '+' : '') + r.net;
+      li.appendChild(left);
+      li.appendChild(meta);
+      list.appendChild(li);
+    });
+    $('share-image-wrap').innerHTML = '';
+  }
+
+  function onShareImage() {
+    var standings = BadRot.ranking.computeStandings(activity.strong, activity.weak, activity.schedule);
+    BadRot.share.renderRankingImage(standings, $('share-image-wrap'));
+    toast('图片已生成，长按图片保存或发送到微信群');
+  }
+
+  function onCopyText() {
+    var standings = BadRot.ranking.computeStandings(activity.strong, activity.weak, activity.schedule);
+    var text = BadRot.share.rankingText(standings);
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); toast('排名文字已复制'); }
+    catch (e) { toast('复制失败，请手动复制'); }
+    document.body.removeChild(ta);
+  }
+
+  function onRematch() {
+    BadRot.storage.clear();
+    activity = null;
+    buildNameInputs('strong-inputs', defaultInputs(), 'btn-add-strong');
+    buildNameInputs('weak-inputs', defaultInputs(), 'btn-add-weak');
+    clearError();
+    showView('setup');
+  }
+
+  function onReshuffle() {
+    activity.schedule = BadRot.rotation.generateSchedule(activity.strong, activity.weak);
+    activity.currentIndex = 0;
+    BadRot.storage.save(activity);
+    renderMatchView();
+    showView('match');
+  }
 
   /* ---------- 启动 ---------- */
   function init() {
@@ -190,6 +245,10 @@
     $('btn-submit-score').addEventListener('click', onSubmitScore);
     $('btn-finish-early').addEventListener('click', onFinishEarly);
     $('btn-standings').addEventListener('click', onShowStandings);
+    $('btn-share-image').addEventListener('click', onShareImage);
+    $('btn-copy-text').addEventListener('click', onCopyText);
+    $('btn-rematch').addEventListener('click', onRematch);
+    $('btn-reshuffle').addEventListener('click', onReshuffle);
 
     var saved = BadRot.storage.load();
     if (saved && saved.schedule && saved.schedule.length === 3) {
