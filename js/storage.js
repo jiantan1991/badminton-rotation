@@ -17,15 +17,28 @@
     s.setItem(KEY, JSON.stringify(activity));
   }
 
+  function isValid(activity) {
+    if (!activity || !Array.isArray(activity.schedule)) return false;
+    if (activity.schedule.length !== 3) return false;
+    return activity.schedule.every(function (m) {
+      return m &&
+        Array.isArray(m.teamA) && m.teamA.length === 2 &&
+        Array.isArray(m.teamB) && m.teamB.length === 2 &&
+        Array.isArray(m.resting);
+    });
+  }
+
   function load() {
     var s = storage();
     if (!s) return null;
     var raw = s.getItem(KEY);
     if (!raw) return null;
     try {
-      return JSON.parse(raw);
+      var data = JSON.parse(raw);
+      if (!isValid(data)) { s.removeItem(KEY); return null; } // 结构坏数据静默清除
+      return data;
     } catch (e) {
-      s.removeItem(KEY); // 坏数据静默清除
+      s.removeItem(KEY); // 语法坏数据静默清除
       return null;
     }
   }

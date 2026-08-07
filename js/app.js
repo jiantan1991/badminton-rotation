@@ -143,10 +143,14 @@
   }
 
   function onSubmitScore() {
-    var a = parseInt($('score-a').value, 10);
-    var b = parseInt($('score-b').value, 10);
+    var rawA = $('score-a').value.trim();
+    var rawB = $('score-b').value.trim();
+    var a = parseInt(rawA, 10);
+    var b = parseInt(rawB, 10);
     var err = $('score-error');
-    if (isNaN(a) || isNaN(b) || a < 0 || a > 99 || b < 0 || b > 99) {
+    if (rawA === '' || rawB === '' || isNaN(a) || isNaN(b) ||
+        a < 0 || a > 99 || b < 0 || b > 99 ||
+        String(a) !== rawA || String(b) !== rawB) {
       err.textContent = '请输入 0~99 的整数比分';
       err.hidden = false; return;
     }
