@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>羽毛球双打轮转</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- ① 设置页 -->
+  <section id="view-setup" class="view" data-view="setup">
+    <h1>🏸 羽毛球双打轮转</h1>
+    <p class="hint">组内按实力从强到弱填写，强组 2~4 人、弱组 2~4 人，总共 6 人</p>
+    <div class="group-box">
+      <h2>强组</h2>
+      <div id="strong-inputs" class="name-inputs"></div>
+      <button type="button" class="btn ghost" id="btn-add-strong">+ 添加强组队员</button>
+    </div>
+    <div class="group-box">
+      <h2>弱组</h2>
+      <div id="weak-inputs" class="name-inputs"></div>
+      <button type="button" class="btn ghost" id="btn-add-weak">+ 添加弱组队员</button>
+    </div>
+    <p id="setup-error" class="error" hidden></p>
+    <button type="button" class="btn primary big" id="btn-generate">生成轮转表</button>
+  </section>
+
+  <!-- ② 轮转表页 -->
+  <section id="view-match" class="view" data-view="match" hidden>
+    <div class="topbar">
+      <span id="match-progress">第 1/3 场</span>
+      <button type="button" class="btn tiny" id="btn-standings">排名</button>
+    </div>
+    <div id="current-match" class="match-card"></div>
+    <div class="score-row">
+      <div class="score-col">
+        <span id="score-a-label" class="team-label"></span>
+        <input type="number" id="score-a" class="score-input" min="0" max="99" inputmode="numeric" placeholder="0">
+      </div>
+      <span class="vs">:</span>
+      <div class="score-col">
+        <span id="score-b-label" class="team-label"></span>
+        <input type="number" id="score-b" class="score-input" min="0" max="99" inputmode="numeric" placeholder="0">
+      </div>
+    </div>
+    <p id="score-error" class="error" hidden></p>
+    <button type="button" class="btn primary big" id="btn-submit-score">提交比分</button>
+    <button type="button" class="btn ghost" id="btn-finish-early">提前结束</button>
+    <details class="preview">
+      <summary>后续场次预览</summary>
+      <div id="later-matches"></div>
+    </details>
+  </section>
+
+  <!-- ③ 结果页 -->
+  <section id="view-result" class="view" data-view="result" hidden>
+    <h1 id="result-title">🏆 积分排名</h1>
+    <ol id="standings-list" class="standings"></ol>
+    <button type="button" class="btn primary big" id="btn-share-image">生成排名图</button>
+    <button type="button" class="btn ghost" id="btn-copy-text">复制排名文字</button>
+    <div id="share-image-wrap"></div>
+    <div class="result-actions">
+      <button type="button" class="btn ghost" id="btn-rematch">再来一局</button>
+      <button type="button" class="btn ghost" id="btn-reshuffle">重新轮转</button>
+    </div>
+  </section>
+
+  <script src="js/rotation.js"></script>
+  <script src="js/ranking.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/share.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
