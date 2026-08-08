@@ -406,7 +406,10 @@
     var act = activity;
     if (BadRot.cloud.isEnabled()) {
       BadRot.cloud.archiveActivity(act, function (res) {
-        if (res && res.ok) { stepNext(); }
+        if (res && res.ok) {
+          BadRot.cloud.pushActivity(null); // 存档后清空云端当前活动，防止下次打开重复存档
+          stepNext();
+        }
         else { toast('历史存档失败，请检查网络后重试'); }
       });
     } else {
