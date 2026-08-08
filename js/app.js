@@ -3,6 +3,7 @@
   var $ = function (id) { return document.getElementById(id); };
 
   var activity = null; // { strong, weak, schedule, currentIndex }
+  var viewIndex = 0;   // 当前显示/编辑的场次（查看历史时与 currentIndex 不同）
 
   /* ---------- 视图切换 ---------- */
   function showView(name) {
@@ -81,6 +82,7 @@
       schedule: BadRot.rotation.generateSchedule(strong, weak, numMatches),
       currentIndex: 0
     };
+    viewIndex = 0;
     saveActivity();
     renderMatchView();
     showView('match');
@@ -122,8 +124,8 @@
   }
 
   function renderMatchView() {
-    var m = activity.schedule[activity.currentIndex];
-    var progress = '第 ' + (activity.currentIndex + 1) + '/' + activity.schedule.length + ' 场';
+    var m = activity.schedule[viewIndex];
+    var progress = '第 ' + (viewIndex + 1) + '/' + activity.schedule.length + ' 场';
     $('match-progress').textContent = progress;
 
     var card = $('current-match');
@@ -141,10 +143,32 @@
     scoreA.value = m.result ? m.result.scoreA : '';
     scoreB.value = m.result ? m.result.scoreB : '';
 
+    // 已打完场次列表（历史，点击可修改）
+    var hist = $('match-history');
+    hist.innerHTML = '';
+    for (var h = 0; h < activity.schedule.length; h++) {
+      if (h === viewIndex) continue;
+      var hm = activity.schedule[h];
+      if (!hm.result) continue;
+      var row = document.createElement('div');
+      row.className = 'item history-row';
+      row.textContent = '第 ' + (h + 1) + ' 场：' + teamLabel(hm.teamA) + ' ' + hm.result.scoreA + ':' + hm.result.scoreB + ' ' + teamLabel(hm.teamB) + ' ✏️';
+      (function (idx) {
+        row.addEventListener('click', function () {
+          viewIndex = idx;
+          renderMatchView();
+        });
+      })(h);
+      hist.appendChild(row);
+    }
+
+    // 返回当前进度按钮（正在查看/修改历史场次时显示）
+    $('btn-back-progress').hidden = viewIndex === activity.currentIndex;
+
     // 后续场次预览
     var later = $('later-matches');
     later.innerHTML = '';
-    for (var i = activity.currentIndex + 1; i < activity.schedule.length; i++) {
+    for (var i = viewIndex + 1; i < activity.schedule.length; i++) {
       var lm = activity.schedule[i];
       var item = document.createElement('div');
       item.className = 'item';
@@ -171,16 +195,25 @@
       err.hidden = false; return;
     }
     err.hidden = true;
-    var m = activity.schedule[activity.currentIndex];
+    var m = activity.schedule[viewIndex];
+    var wasResult = !!m.result;
     m.result = { scoreA: a, scoreB: b };
     saveActivity();
 
-    if (activity.currentIndex + 1 >= activity.schedule.length) {
-      renderResultView();
-      showView('result');
+    if (!wasResult && viewIndex === activity.currentIndex) {
+      // 正常打完一场 → 推进
+      if (viewIndex + 1 >= activity.schedule.length) {
+        renderResultView();
+        showView('result');
+      } else {
+        activity.currentIndex += 1;
+        viewIndex = activity.currentIndex;
+        saveActivity();
+        renderMatchView();
+      }
     } else {
-      activity.currentIndex += 1;
-      saveActivity();
+      // 修改已打过的比分 → 覆盖不推进
+      toast('比分已修改');
       renderMatchView();
     }
   }
@@ -233,6 +266,7 @@
   function onRematch() {
     BadRot.storage.clear();
     activity = null;
+    viewIndex = 0;
     buildNameInputs('strong-inputs', defaultInputs(), 'btn-add-strong');
     buildNameInputs('weak-inputs', defaultInputs(), 'btn-add-weak');
     clearError();
@@ -242,9 +276,15 @@
   function onReshuffle() {
     activity.schedule = BadRot.rotation.generateSchedule(activity.strong, activity.weak, activity.schedule.length);
     activity.currentIndex = 0;
+    viewIndex = 0;
     saveActivity();
     renderMatchView();
     showView('match');
+  }
+
+  function onBackProgress() {
+    viewIndex = activity.currentIndex;
+    renderMatchView();
   }
 
   /* ---------- 云同步 ---------- */
@@ -279,6 +319,7 @@
           (!cloudAct.updatedAt || activity.updatedAt >= cloudAct.updatedAt);
         if (localNewer) return;
         activity = cloudAct;
+        viewIndex = activity.currentIndex;
         BadRot.storage.save(activity);
         var view = getCurrentView();
         if (view === 'match') renderMatchView();
@@ -295,6 +336,7 @@
     $('btn-submit-score').addEventListener('click', onSubmitScore);
     $('btn-finish-early').addEventListener('click', onFinishEarly);
     $('btn-standings').addEventListener('click', onShowStandings);
+    $('btn-back-progress').addEventListener('click', onBackProgress);
     $('btn-share-image').addEventListener('click', onShareImage);
     $('btn-copy-text').addEventListener('click', onCopyText);
     $('btn-rematch').addEventListener('click', onRematch);
@@ -303,6 +345,7 @@
     var saved = BadRot.storage.load();
     if (saved && saved.schedule && saved.schedule.length >= 3) {
       activity = saved;
+      viewIndex = activity.currentIndex;
       applyView();
     } else {
       showView('setup');
@@ -323,6 +366,7 @@
             (cloudAct.updatedAt && cloudAct.updatedAt > activity.updatedAt);
           if (cloudNewer) {
             activity = cloudAct;
+            viewIndex = activity.currentIndex;
             BadRot.storage.save(activity);
             applyView();
           }
