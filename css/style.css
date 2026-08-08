@@ -3,6 +3,8 @@ body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
 h1 { font-size: 22px; text-align: center; margin: 12px 0; }
 h2 { font-size: 16px; margin: 10px 0 6px; }
 .hint { color: #888; font-size: 13px; text-align: center; margin-bottom: 14px; }
+.cloud-status { color: #07c160; font-size: 12px; text-align: center; margin: -8px 0 12px; }
+.cloud-status.off { color: #999; }
 .view { display: block; }
 .view[hidden] { display: none !important; }
 .group-box { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -12,11 +14,9 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
 .btn.ghost { background: #fff; color: #555; border: 1px solid #ddd; }
 .btn.big { height: 50px; font-size: 17px; }
 .btn.tiny { width: auto; height: 30px; font-size: 13px; margin: 0; padding: 0 10px; }
-.round-select { display: flex; gap: 8px; flex-wrap: wrap; }
-.round-select label { flex: 1; min-width: 64px; text-align: center; }
-.round-select input { display: none; }
-.round-select input:checked + span { background: #07c160; color: #fff; border-color: #07c160; }
-.round-select span { display: block; padding: 10px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 15px; background: #fff; color: #555; cursor: pointer; }
+.round-select { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.match-count-input { width: 100%; height: 48px; font-size: 20px; text-align: center; border: 1px solid #ddd; border-radius: 10px; }
+.match-count-hint { margin: 8px 0 0; text-align: left; }
 .error { color: #e64340; font-size: 14px; text-align: center; margin: 8px 0; }
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 15px; color: #555; }
 .match-card { background: #fff; border-radius: 14px; padding: 18px 12px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.08); }

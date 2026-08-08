@@ -17,8 +17,8 @@ def main():
         '<style>\n' + css + '\n</style>'
     )
 
-    # 2) 内联 JS（保持加载顺序 rotation → ranking → storage → share → app）
-    for name in ['rotation', 'ranking', 'storage', 'share', 'app']:
+    # 2) 内联 JS（保持加载顺序：vendor/cloudbase-sdk → cloud → rotation → ranking → storage → share → app）
+    for name in ['vendor/cloudbase-sdk', 'cloud', 'rotation', 'ranking', 'storage', 'share', 'app']:
         js = (ROOT / 'js' / (name + '.js')).read_text(encoding='utf-8')
         tag = '<script src="js/%s.js"></script>' % name
         assert tag in html, '缺少 %s 的引用' % tag

@@ -11,6 +11,7 @@
   <section id="view-setup" class="view" data-view="setup">
     <h1>🏸 羽毛球双打轮转</h1>
     <p class="hint">组内按实力从强到弱填写，强组 2~4 人、弱组 2~4 人，总共 6 人</p>
+    <p id="cloud-status" class="cloud-status">☁️ 云端同步中…</p>
     <div class="group-box">
       <h2>强组</h2>
       <div id="strong-inputs" class="name-inputs"></div>
@@ -24,10 +25,8 @@
     <div class="group-box">
       <h2>场数</h2>
       <div class="round-select">
-        <label><input type="radio" name="matchCount" value="12" checked><span>12 场</span></label>
-        <label><input type="radio" name="matchCount" value="15"><span>15 场</span></label>
-        <label><input type="radio" name="matchCount" value="18"><span>18 场</span></label>
-        <label><input type="radio" name="matchCount" value="21"><span>21 场</span></label>
+        <input type="number" id="match-count" class="match-count-input" min="3" max="30" step="3" value="12" inputmode="numeric">
+        <p class="hint match-count-hint">3~30 的整数；建议 3 的倍数（12/15/18/21），保证每人场次完全一致</p>
       </div>
     </div>
     <p id="setup-error" class="error" hidden></p>
@@ -81,6 +80,8 @@
     </div>
   </section>
 
+  <script src="js/vendor/cloudbase-sdk.js"></script>
+  <script src="js/cloud.js"></script>
   <script src="js/rotation.js"></script>
   <script src="js/ranking.js"></script>
   <script src="js/storage.js"></script>

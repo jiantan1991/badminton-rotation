@@ -72,16 +72,20 @@
     var weak = collectNames('weak-inputs');
     var err = validateSetup(strong, weak);
     if (err) { showError(err); return; }
+    var countEl = $('match-count');
+    var numMatches = parseInt(countEl.value, 10);
+    if (isNaN(numMatches) || numMatches < 3 || numMatches > 30 || String(numMatches) !== countEl.value.trim()) {
+      showError('场数需为 3~30 的整数');
+      return;
+    }
     clearError();
-    var countEl = document.querySelector('input[name="matchCount"]:checked');
-    var numMatches = countEl ? parseInt(countEl.value, 10) : 12;
     activity = {
       strong: strong,
       weak: weak,
       schedule: BadRot.rotation.generateSchedule(strong, weak, numMatches),
       currentIndex: 0
     };
-    BadRot.storage.save(activity);
+    saveActivity();
     renderMatchView();
     showView('match');
   }
@@ -173,14 +177,14 @@
     err.hidden = true;
     var m = activity.schedule[activity.currentIndex];
     m.result = { scoreA: a, scoreB: b };
-    BadRot.storage.save(activity);
+    saveActivity();
 
     if (activity.currentIndex + 1 >= activity.schedule.length) {
       renderResultView();
       showView('result');
     } else {
       activity.currentIndex += 1;
-      BadRot.storage.save(activity);
+      saveActivity();
       renderMatchView();
     }
   }
@@ -240,7 +244,7 @@
     var restored = BadRot.storage.importText($('backup-text').value);
     if (!restored) { toast('备份格式不正确，请检查粘贴内容'); return; }
     activity = restored;
-    BadRot.storage.save(activity);
+    saveActivity();
     if (BadRot.ranking.isComplete(activity.schedule)) { renderResultView(); showView('result'); }
     else { renderMatchView(); showView('match'); }
     toast('数据恢复成功');
@@ -258,9 +262,49 @@
   function onReshuffle() {
     activity.schedule = BadRot.rotation.generateSchedule(activity.strong, activity.weak, activity.schedule.length);
     activity.currentIndex = 0;
-    BadRot.storage.save(activity);
+    saveActivity();
     renderMatchView();
     showView('match');
+  }
+
+  /* ---------- 云同步 ---------- */
+  function saveActivity() {
+    activity.updatedAt = Date.now();
+    BadRot.storage.save(activity);
+    BadRot.cloud.pushActivity(activity); // 未连接时内部静默跳过
+  }
+
+  function applyView() {
+    if (BadRot.ranking.isComplete(activity.schedule)) { renderResultView(); showView('result'); }
+    else { renderMatchView(); showView('match'); }
+  }
+
+  function getCurrentView() {
+    var views = document.querySelectorAll('.view');
+    for (var i = 0; i < views.length; i++) {
+      if (!views[i].hidden) return views[i].getAttribute('data-view');
+    }
+    return 'setup';
+  }
+
+  function startCloudPolling() {
+    setInterval(function () {
+      if (!BadRot.cloud.isEnabled()) return;
+      BadRot.cloud.fetchActivity(function (cloudAct) {
+        if (!cloudAct || !activity || !cloudAct.schedule) return;
+        // 正在输入比分时不覆盖
+        var ae = document.activeElement;
+        if (ae && (ae.id === 'score-a' || ae.id === 'score-b')) return;
+        var localNewer = activity.updatedAt &&
+          (!cloudAct.updatedAt || activity.updatedAt >= cloudAct.updatedAt);
+        if (localNewer) return;
+        activity = cloudAct;
+        BadRot.storage.save(activity);
+        var view = getCurrentView();
+        if (view === 'match') renderMatchView();
+        else if (view === 'result') renderResultView();
+      });
+    }, 10000);
   }
 
   /* ---------- 启动 ---------- */
@@ -281,11 +325,35 @@
     var saved = BadRot.storage.load();
     if (saved && saved.schedule && saved.schedule.length >= 3) {
       activity = saved;
-      if (BadRot.ranking.isComplete(activity.schedule)) { renderResultView(); showView('result'); }
-      else { renderMatchView(); showView('match'); }
+      applyView();
     } else {
       showView('setup');
     }
+
+    // 云同步初始化：拉取云端最新数据（云端更新则覆盖），随后启动轮询
+    var cloudStatus = $('cloud-status');
+    BadRot.cloud.init(function (ok) {
+      if (!ok) {
+        cloudStatus.textContent = '☁️ 云端未连接（本地模式）';
+        cloudStatus.className = 'cloud-status off';
+        return;
+      }
+      cloudStatus.textContent = '☁️ 云端已连接，数据自动同步';
+      BadRot.cloud.fetchActivity(function (cloudAct) {
+        if (cloudAct && cloudAct.schedule && cloudAct.schedule.length >= 3) {
+          var cloudNewer = !activity || !activity.updatedAt ||
+            (cloudAct.updatedAt && cloudAct.updatedAt > activity.updatedAt);
+          if (cloudNewer) {
+            activity = cloudAct;
+            BadRot.storage.save(activity);
+            applyView();
+          }
+        } else if (activity) {
+          saveActivity(); // 云端为空、本地有数据 → 首次推送
+        }
+        startCloudPolling();
+      });
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);
