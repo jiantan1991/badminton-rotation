@@ -96,7 +96,8 @@
       id: id,
       date: id.slice(0, 8),
       matchCount: activity.schedule.length,
-      complete: activity.schedule.every(function (m) { return !!m && !!m.result; })
+      complete: activity.schedule.every(function (m) { return !!m && !!m.result; }),
+      finished: !!activity.finished
     };
     arr.push(meta);
     while (arr.length > MAX_HISTORY) { // 超上限删最旧（连带明细键，避免孤儿数据残留）

@@ -219,6 +219,8 @@
   }
 
   function onFinishEarly() {
+    activity.finished = true; // 提前结束 = 球局终止：存档进历史，其他人打开显示新球局页
+    saveActivity();
     renderResultView();
     showView('result');
   }
@@ -316,7 +318,8 @@
       list.forEach(function (h) {
         var row = document.createElement('div');
         row.className = 'item history-row';
-        row.textContent = '🗓️ ' + fmtDate(h.date) + ' ' + (h.id.indexOf('-') > 0 ? h.id.split('-')[1] : '') + ' · ' + h.matchCount + '场 · ' + (h.complete ? '已完成' : '进行中');
+        var status = h.complete ? '已完成' : (h.finished ? '提前结束' : '进行中');
+        row.textContent = '🗓️ ' + fmtDate(h.date) + ' ' + (h.id.indexOf('-') > 0 ? h.id.split('-')[1] : '') + ' · ' + h.matchCount + '场 · ' + status;
         (function (id) {
           row.addEventListener('click', function () { onHistorySelect(id); });
         })(h.id);
@@ -373,7 +376,12 @@
   /* ---------- 云同步 ---------- */
   var archivedThisSession = {}; // 按 updatedAt 去重，避免同一完赛活动重复存档
 
-  // 完赛活动：自动存档为历史球局并显示新球局页面（设置页）
+  // 球局是否已结束（打完 或 提前结束）
+  function isFinished(act) {
+    return !!act.finished || BadRot.ranking.isComplete(act.schedule);
+  }
+
+  // 完赛/提前结束活动：自动存档为历史球局并显示新球局页面（设置页）
   function autoArchiveComplete(act) {
     var key = act.updatedAt || 'x';
     if (archivedThisSession[key]) return;
@@ -431,8 +439,8 @@
         var localNewer = activity.updatedAt &&
           (!cloudAct.updatedAt || activity.updatedAt >= cloudAct.updatedAt);
         if (localNewer) return;
-        if (BadRot.ranking.isComplete(cloudAct.schedule)) {
-          autoArchiveComplete(cloudAct); // 云端完赛：自动存档 + 新球局页面（不弹结果页）
+        if (isFinished(cloudAct)) {
+          autoArchiveComplete(cloudAct); // 云端已结束：自动存档 + 新球局页面（不弹结果页）
           return;
         }
         activity = cloudAct;
@@ -464,8 +472,8 @@
 
     var saved = BadRot.storage.load();
     if (saved && saved.schedule && saved.schedule.length >= 3) {
-      if (BadRot.ranking.isComplete(saved.schedule)) {
-        autoArchiveComplete(saved); // 已完赛：自动存档 + 显示新球局页面
+      if (isFinished(saved)) {
+        autoArchiveComplete(saved); // 已结束（打完/提前结束）：自动存档 + 显示新球局页面
       } else {
         activity = saved;
         viewIndex = activity.currentIndex;
@@ -489,8 +497,8 @@
           var cloudNewer = !activity || !activity.updatedAt ||
             (cloudAct.updatedAt && cloudAct.updatedAt > activity.updatedAt);
           if (cloudNewer) {
-            if (BadRot.ranking.isComplete(cloudAct.schedule)) {
-              autoArchiveComplete(cloudAct); // 云端完赛活动：自动存档 + 新球局页面
+            if (isFinished(cloudAct)) {
+              autoArchiveComplete(cloudAct); // 云端已结束活动：自动存档 + 新球局页面
             } else {
               activity = cloudAct;
               viewIndex = activity.currentIndex;

@@ -50,6 +50,7 @@ def list_activities():
             'date': sid[:8],
             'matchCount': len(schedule),
             'complete': all(m.get('result') for m in schedule),
+            'finished': bool(data.get('finished'))
         })
     items.sort(key=lambda x: x['id'], reverse=True)
     return items[:MAX_HISTORY]
