@@ -21,9 +21,11 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
 .btn.ghost { background: #fff; color: #555; border: 1px solid #ddd; }
 .btn.big { height: 50px; font-size: 17px; }
 .btn.tiny { width: auto; height: 30px; font-size: 13px; margin: 0; padding: 0 10px; }
-.round-select { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.match-count-input { width: 100%; height: 48px; font-size: 20px; text-align: center; border: 1px solid #ddd; border-radius: 10px; }
-.match-count-hint { margin: 8px 0 0; text-align: left; }
+.round-select { display: flex; gap: 8px; flex-wrap: wrap; }
+.round-select label { flex: 1; min-width: 64px; text-align: center; }
+.round-select input { display: none; }
+.round-select input:checked + span { background: #07c160; color: #fff; border-color: #07c160; }
+.round-select span { display: block; padding: 10px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 15px; background: #fff; color: #555; cursor: pointer; }
 .error { color: #e64340; font-size: 14px; text-align: center; margin: 8px 0; }
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 15px; color: #555; }
 .match-card { background: #fff; border-radius: 14px; padding: 18px 12px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
@@ -71,8 +73,10 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
     <div class="group-box">
       <h2>场数</h2>
       <div class="round-select">
-        <input type="number" id="match-count" class="match-count-input" min="3" max="30" step="3" value="12" inputmode="numeric">
-        <p class="hint match-count-hint">3~30 的整数；建议 3 的倍数（12/15/18/21），保证每人场次完全一致</p>
+        <label><input type="radio" name="matchCount" value="12" checked><span>12 场</span></label>
+        <label><input type="radio" name="matchCount" value="15"><span>15 场</span></label>
+        <label><input type="radio" name="matchCount" value="18"><span>18 场</span></label>
+        <label><input type="radio" name="matchCount" value="21"><span>21 场</span></label>
       </div>
     </div>
     <p id="setup-error" class="error" hidden></p>
@@ -30641,12 +30645,8 @@ web-streams-polyfill/dist/ponyfill.js:
     var weak = collectNames('weak-inputs');
     var err = validateSetup(strong, weak);
     if (err) { showError(err); return; }
-    var countEl = $('match-count');
-    var numMatches = parseInt(countEl.value, 10);
-    if (isNaN(numMatches) || numMatches < 3 || numMatches > 30 || String(numMatches) !== countEl.value.trim()) {
-      showError('场数需为 3~30 的整数');
-      return;
-    }
+    var countEl = document.querySelector('input[name="matchCount"]:checked');
+    var numMatches = countEl ? parseInt(countEl.value, 10) : 12;
     clearError();
     activity = {
       strong: strong,

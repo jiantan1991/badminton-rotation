@@ -72,12 +72,8 @@
     var weak = collectNames('weak-inputs');
     var err = validateSetup(strong, weak);
     if (err) { showError(err); return; }
-    var countEl = $('match-count');
-    var numMatches = parseInt(countEl.value, 10);
-    if (isNaN(numMatches) || numMatches < 3 || numMatches > 30 || String(numMatches) !== countEl.value.trim()) {
-      showError('场数需为 3~30 的整数');
-      return;
-    }
+    var countEl = document.querySelector('input[name="matchCount"]:checked');
+    var numMatches = countEl ? parseInt(countEl.value, 10) : 12;
     clearError();
     activity = {
       strong: strong,
