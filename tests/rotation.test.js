@@ -31,6 +31,23 @@ function opponentPairs(schedule) {
   return pairs;
 }
 
+// 每人最大连续上场次数（应 ≤ 2，不允许连打 3 场）
+function maxConsecutive(schedule) {
+  const last = {}, max = {};
+  for (const m of schedule) {
+    const playing = new Set(m.teamA.concat(m.teamB).map(p => p.name));
+    for (const name of Object.keys(last)) {
+      if (!playing.has(name)) {
+        max[name] = Math.max(max[name] || 0, last[name]);
+        last[name] = 0;
+      }
+    }
+    for (const name of playing) last[name] = (last[name] || 0) + 1;
+  }
+  for (const name of Object.keys(last)) max[name] = Math.max(max[name] || 0, last[name]);
+  return max;
+}
+
 const S = ['强1', '强2', '强3'];
 const W = ['弱1', '弱2', '弱3'];
 
@@ -51,7 +68,8 @@ const W = ['弱1', '弱2', '弱3'];
   const dist = Object.values(partnerDist(sched));
   assert.strictEqual(dist.length, 9, '应覆盖全部 9 种强弱搭档组合');
   assert.ok(Math.max(...dist) - Math.min(...dist) <= 2, '搭档分布应均衡: ' + JSON.stringify(dist));
-  assert.ok(opponentPairs(sched).size >= 10, '对阵应尽量分散（至少 10 种不同），实际 ' + opponentPairs(sched).size + '/12');
+  // 连续≤2 硬约束下人选组合受限，对阵种类 ≥6 即可（数学上限约 9）
+  assert.ok(opponentPairs(sched).size >= 6, '对阵应尽量分散（至少 6 种不同），实际 ' + opponentPairs(sched).size + '/12');
 }
 
 // ---- 2强4弱 × 12 场：每人恰好 8 场，含纯弱场 ----
@@ -89,6 +107,28 @@ const W = ['弱1', '弱2', '弱3'];
   assert.strictEqual(sched.length, 3);
   const counts = countOccurrences(sched);
   for (const n of [...S, ...W]) assert.strictEqual(counts[n], 2, n + ' 3场应上场 2 次');
+}
+
+// ---- 连续上场限制：任何场数下每人最多连续 2 场（不允许连打 3 场）----
+{
+  for (const n of [12, 15, 18, 21]) {
+    const sched = Rotation.generateSchedule(S, W, n);
+    const mc = maxConsecutive(sched);
+    for (const name of [...S, ...W]) {
+      assert.ok(mc[name] <= 2, n + ' 场 ' + name + ' 连续 ' + mc[name] + ' 场（最多 2 场）');
+    }
+  }
+  // 2v4 / 4v2 同样受限
+  {
+    const sched = Rotation.generateSchedule(['强1', '强2'], ['弱1', '弱2', '弱3', '弱4'], 12);
+    const mc = maxConsecutive(sched);
+    for (const n of ['强1', '强2', '弱1', '弱2', '弱3', '弱4']) assert.ok(mc[n] <= 2, '2v4 ' + n + ' 连续 ' + mc[n] + ' 场');
+  }
+  {
+    const sched = Rotation.generateSchedule(['强1', '强2', '强3', '强4'], ['弱1', '弱2'], 12);
+    const mc = maxConsecutive(sched);
+    for (const n of ['强1', '强2', '强3', '强4', '弱1', '弱2']) assert.ok(mc[n] <= 2, '4v2 ' + n + ' 连续 ' + mc[n] + ' 场');
+  }
 }
 
 // ---- 非法输入 ----

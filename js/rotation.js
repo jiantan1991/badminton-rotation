@@ -73,7 +73,8 @@
 
     // ---- 状态 ----
     var played = {};
-    all.forEach(function (p) { played[p.name] = 0; });
+    var consecutive = {}; // 当前连续上场次数（用于限制连打 3 场）
+    all.forEach(function (p) { played[p.name] = 0; consecutive[p.name] = 0; });
     var partnerCount = {};
     var opponentUsed = {};
     var limit = Math.ceil((2 * n) / 3); // 每人上场上限（n 被 3 整除时 = 2n/3）
@@ -88,40 +89,68 @@
       return max - min;
     }
 
+    // 候选评分（越高越好）
+    function scoreCandidate(cand) {
+      // 模拟选后全局均衡（含休息者）
+      var newMax = -1, newMin = 1e9;
+      all.forEach(function (p) {
+        var v = played[p.name] + (cand.players.indexOf(p) !== -1 ? 1 : 0);
+        if (v > newMax) newMax = v;
+        if (v < newMin) newMin = v;
+      });
+      var score = -(newMax - newMin) * 100;          // 均衡（优先）
+      if (!opponentUsed[key4(cand.teamA, cand.teamB)]) score += 80; // 对阵未用过
+      score -= (partnerCount[key2(cand.teamA)] || 0) * 2;
+      score -= (partnerCount[key2(cand.teamB)] || 0) * 2;           // 搭档分散
+      [cand.teamA, cand.teamB].forEach(function (t) {
+        if (countIn(t, 's') === 1 && countIn(t, 'w') === 1) score += 10; // 强弱搭配偏好（不对称场景）
+      });
+      return score;
+    }
+
     var schedule = [];
     for (var i = 1; i <= n; i++) {
       var best = null;
       var bestScore = -Infinity;
       for (var ci = 0; ci < pool.length; ci++) {
         var cand = pool[ci];
-        // 硬约束：上场数达上限的人不能再选
+        // 硬约束 1：上场数达上限的人不能再选
         var over = false;
         for (var pi = 0; pi < cand.players.length; pi++) {
           if (played[cand.players[pi].name] >= limit) { over = true; break; }
         }
         if (over) continue;
+        // 硬约束 2：已连续 2 场的人不能再上（不允许连打 3 场）
+        var overC = false;
+        for (var pj = 0; pj < cand.players.length; pj++) {
+          if (consecutive[cand.players[pj].name] >= 2) { overC = true; break; }
+        }
+        if (overC) continue;
 
-        // 模拟选后全局均衡（含休息者）
-        var newMax = -1, newMin = 1e9;
-        all.forEach(function (p) {
-          var v = played[p.name] + (cand.players.indexOf(p) !== -1 ? 1 : 0);
-          if (v > newMax) newMax = v;
-          if (v < newMin) newMin = v;
-        });
-        var score = -(newMax - newMin) * 100;          // 均衡（优先）
-        if (!opponentUsed[key4(cand.teamA, cand.teamB)]) score += 50; // 对阵未用过
-        score -= (partnerCount[key2(cand.teamA)] || 0) * 2;
-        score -= (partnerCount[key2(cand.teamB)] || 0) * 2;           // 搭档分散
-        [cand.teamA, cand.teamB].forEach(function (t) {
-          if (countIn(t, 's') === 1 && countIn(t, 'w') === 1) score += 10; // 强弱搭配偏好（不对称场景）
-        });
-
+        var score = scoreCandidate(cand);
         if (score > bestScore) { bestScore = score; best = cand; }
+      }
+      if (!best) {
+        // 回退：放宽连续约束（仅保留上限约束）——理论不发生，防死循环保底
+        for (var ci2 = 0; ci2 < pool.length; ci2++) {
+          var cand2 = pool[ci2];
+          var over2 = false;
+          for (var pi2 = 0; pi2 < cand2.players.length; pi2++) {
+            if (played[cand2.players[pi2].name] >= limit) { over2 = true; break; }
+          }
+          if (over2) continue;
+          var s2 = scoreCandidate(cand2);
+          if (s2 > bestScore) { bestScore = s2; best = cand2; }
+        }
       }
       if (!best) break; // 理论不会发生（候选池足够大）
 
       // 更新状态
-      best.players.forEach(function (p) { played[p.name] += 1; });
+      var playingNow = {};
+      best.players.forEach(function (p) { played[p.name] += 1; playingNow[p.name] = true; });
+      all.forEach(function (p) {
+        consecutive[p.name] = playingNow[p.name] ? consecutive[p.name] + 1 : 0;
+      });
       partnerCount[key2(best.teamA)] = (partnerCount[key2(best.teamA)] || 0) + 1;
       partnerCount[key2(best.teamB)] = (partnerCount[key2(best.teamB)] || 0) + 1;
       opponentUsed[key4(best.teamA, best.teamB)] = true;
