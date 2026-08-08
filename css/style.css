@@ -30,6 +30,8 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
 .preview { background: #fff; border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
 .preview summary { cursor: pointer; color: #555; }
 .preview .item { padding: 6px 0; border-bottom: 1px dashed #eee; color: #666; }
+.backup-hint { margin: 8px 0 4px; font-size: 12px; text-align: left; }
+.backup-input { width: 100%; height: 64px; font-size: 12px; border: 1px solid #ddd; border-radius: 8px; padding: 8px; margin-top: 8px; resize: vertical; box-sizing: border-box; }
 .standings { list-style: none; counter-reset: rank; background: #fff; border-radius: 14px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
 .standings li { display: flex; justify-content: space-between; padding: 12px 8px; border-bottom: 1px solid #f0f0f0; font-size: 16px; }
 .standings li:last-child { border-bottom: none; }

@@ -106,6 +106,16 @@
     toast._t = setTimeout(function () { el.style.display = 'none'; }, 1800);
   }
 
+  function copyText(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); return true; }
+    catch (e) { return false; }
+    finally { document.body.removeChild(ta); }
+  }
+
   /* ---------- 轮转表页 ---------- */
   function teamLabel(team) {
     return team.map(function (p) { return (p.group === 's' ? '💪' : '') + p.name; }).join(' + ');
@@ -217,13 +227,23 @@
   function onCopyText() {
     var standings = BadRot.ranking.computeStandings(activity.strong, activity.weak, activity.schedule);
     var text = BadRot.share.rankingText(standings);
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); toast('排名文字已复制'); }
-    catch (e) { toast('复制失败，请手动复制'); }
-    document.body.removeChild(ta);
+    toast(copyText(text) ? '排名文字已复制' : '复制失败，请手动复制');
+  }
+
+  function onExport() {
+    if (!activity) { toast('还没有数据可备份'); return; }
+    var text = BadRot.storage.exportText(activity);
+    toast(copyText(text) ? '备份文本已复制，粘贴到微信聊天保存即可' : '复制失败，请长按手动复制');
+  }
+
+  function onImport() {
+    var restored = BadRot.storage.importText($('backup-text').value);
+    if (!restored) { toast('备份格式不正确，请检查粘贴内容'); return; }
+    activity = restored;
+    BadRot.storage.save(activity);
+    if (BadRot.ranking.isComplete(activity.schedule)) { renderResultView(); showView('result'); }
+    else { renderMatchView(); showView('match'); }
+    toast('数据恢复成功');
   }
 
   function onRematch() {
@@ -255,9 +275,11 @@
     $('btn-copy-text').addEventListener('click', onCopyText);
     $('btn-rematch').addEventListener('click', onRematch);
     $('btn-reshuffle').addEventListener('click', onReshuffle);
+    $('btn-export').addEventListener('click', onExport);
+    $('btn-import').addEventListener('click', onImport);
 
     var saved = BadRot.storage.load();
-    if (saved && saved.schedule && saved.schedule.length === 3) {
+    if (saved && saved.schedule && saved.schedule.length >= 3) {
       activity = saved;
       if (BadRot.ranking.isComplete(activity.schedule)) { renderResultView(); showView('result'); }
       else { renderMatchView(); showView('match'); }

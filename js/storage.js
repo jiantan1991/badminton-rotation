@@ -48,9 +48,31 @@
     if (s) s.removeItem(KEY);
   }
 
+  // 导出备份文本：{type, version, data: activity}
+  function exportText(activity) {
+    return JSON.stringify({ type: 'badminton-backup', version: 1, data: activity });
+  }
+
+  // 导入备份文本：校验通过返回 activity，否则返回 null
+  function importText(text) {
+    if (typeof text !== 'string' || !text) return null;
+    var obj;
+    try { obj = JSON.parse(text); } catch (e) { return null; }
+    if (!obj || obj.type !== 'badminton-backup' || !isValid(obj.data)) return null;
+    return obj.data;
+  }
+
   function setImpl(mock) { impl = mock; }
 
-  var Storage = { KEY: KEY, save: save, load: load, clear: clear, _setImpl: setImpl };
+  var Storage = {
+    KEY: KEY,
+    save: save,
+    load: load,
+    clear: clear,
+    exportText: exportText,
+    importText: importText,
+    _setImpl: setImpl
+  };
   if (typeof module !== 'undefined' && module.exports) { module.exports = Storage; }
   else { global.BadRot = global.BadRot || {}; global.BadRot.storage = Storage; }
 })(typeof window !== 'undefined' ? window : globalThis);
