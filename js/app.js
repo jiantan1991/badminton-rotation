@@ -230,22 +230,6 @@
     toast(copyText(text) ? '排名文字已复制' : '复制失败，请手动复制');
   }
 
-  function onExport() {
-    if (!activity) { toast('还没有数据可备份'); return; }
-    var text = BadRot.storage.exportText(activity);
-    toast(copyText(text) ? '备份文本已复制，粘贴到微信聊天保存即可' : '复制失败，请长按手动复制');
-  }
-
-  function onImport() {
-    var restored = BadRot.storage.importText($('backup-text').value);
-    if (!restored) { toast('备份格式不正确，请检查粘贴内容'); return; }
-    activity = restored;
-    saveActivity();
-    if (BadRot.ranking.isComplete(activity.schedule)) { renderResultView(); showView('result'); }
-    else { renderMatchView(); showView('match'); }
-    toast('数据恢复成功');
-  }
-
   function onRematch() {
     BadRot.storage.clear();
     activity = null;
@@ -315,8 +299,6 @@
     $('btn-copy-text').addEventListener('click', onCopyText);
     $('btn-rematch').addEventListener('click', onRematch);
     $('btn-reshuffle').addEventListener('click', onReshuffle);
-    $('btn-export').addEventListener('click', onExport);
-    $('btn-import').addEventListener('click', onImport);
 
     var saved = BadRot.storage.load();
     if (saved && saved.schedule && saved.schedule.length >= 3) {

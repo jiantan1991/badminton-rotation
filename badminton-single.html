@@ -39,8 +39,6 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
 .preview { background: #fff; border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
 .preview summary { cursor: pointer; color: #555; }
 .preview .item { padding: 6px 0; border-bottom: 1px dashed #eee; color: #666; }
-.backup-hint { margin: 8px 0 4px; font-size: 12px; text-align: left; }
-.backup-input { width: 100%; height: 64px; font-size: 12px; border: 1px solid #ddd; border-radius: 8px; padding: 8px; margin-top: 8px; resize: vertical; box-sizing: border-box; }
 .standings { list-style: none; counter-reset: rank; background: #fff; border-radius: 14px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
 .standings li { display: flex; justify-content: space-between; padding: 12px 8px; border-bottom: 1px solid #f0f0f0; font-size: 16px; }
 .standings li:last-child { border-bottom: none; }
@@ -81,13 +79,6 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
     </div>
     <p id="setup-error" class="error" hidden></p>
     <button type="button" class="btn primary big" id="btn-generate">生成轮转表</button>
-    <details class="preview backup">
-      <summary>💾 数据备份</summary>
-      <p class="hint backup-hint">微信清理缓存可能导致数据丢失，建议打完随时备份：复制文本 → 粘贴到微信聊天/文件传输助手保存。</p>
-      <button type="button" class="btn ghost" id="btn-export">复制备份文本</button>
-      <textarea id="backup-text" class="backup-input" placeholder="恢复时：粘贴备份文本，点下方恢复按钮"></textarea>
-      <button type="button" class="btn ghost" id="btn-import">恢复数据</button>
-    </details>
   </section>
 
   <!-- ② 轮转表页 -->
@@ -842,22 +833,6 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
     toast(copyText(text) ? '排名文字已复制' : '复制失败，请手动复制');
   }
 
-  function onExport() {
-    if (!activity) { toast('还没有数据可备份'); return; }
-    var text = BadRot.storage.exportText(activity);
-    toast(copyText(text) ? '备份文本已复制，粘贴到微信聊天保存即可' : '复制失败，请长按手动复制');
-  }
-
-  function onImport() {
-    var restored = BadRot.storage.importText($('backup-text').value);
-    if (!restored) { toast('备份格式不正确，请检查粘贴内容'); return; }
-    activity = restored;
-    saveActivity();
-    if (BadRot.ranking.isComplete(activity.schedule)) { renderResultView(); showView('result'); }
-    else { renderMatchView(); showView('match'); }
-    toast('数据恢复成功');
-  }
-
   function onRematch() {
     BadRot.storage.clear();
     activity = null;
@@ -927,8 +902,6 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
     $('btn-copy-text').addEventListener('click', onCopyText);
     $('btn-rematch').addEventListener('click', onRematch);
     $('btn-reshuffle').addEventListener('click', onReshuffle);
-    $('btn-export').addEventListener('click', onExport);
-    $('btn-import').addEventListener('click', onImport);
 
     var saved = BadRot.storage.load();
     if (saved && saved.schedule && saved.schedule.length >= 3) {
