@@ -69,4 +69,17 @@ Storage.save(activity);
 Storage.clear();
 assert.strictEqual(Storage.load(), null);
 
+// ---- 本地历史（无后端降级）----
+{
+  const h1 = { strong: ['a'], weak: ['b'], schedule: [{ result: { scoreA: 1, scoreB: 2 } }, { result: null }] };
+  const meta = Storage.saveHistory(h1);
+  assert.ok(meta && meta.id && meta.matchCount === 2 && meta.complete === false, 'saveHistory 应返回元数据');
+  assert.ok(/^\d{8}$/.test(meta.date), 'date 应为 8 位纯日期');
+  const list = Storage.loadHistory();
+  assert.strictEqual(list.length, 1, '列表应有 1 条');
+  const loaded = Storage.loadHistoryById(meta.id);
+  assert.strictEqual(loaded.strong[0], 'a', '按 ID 应能读回');
+  assert.strictEqual(Storage.loadHistoryById('nonexist'), null, '不存在返回 null');
+}
+
 console.log('✓ storage.test.js 全部通过');

@@ -264,13 +264,17 @@
   }
 
   function onRematch() {
-    BadRot.storage.clear();
-    activity = null;
-    viewIndex = 0;
-    buildNameInputs('strong-inputs', defaultInputs(), 'btn-add-strong');
-    buildNameInputs('weak-inputs', defaultInputs(), 'btn-add-weak');
-    clearError();
-    showView('setup');
+    var reset = function () {
+      BadRot.storage.clear();
+      activity = null;
+      viewIndex = 0;
+      buildNameInputs('strong-inputs', defaultInputs(), 'btn-add-strong');
+      buildNameInputs('weak-inputs', defaultInputs(), 'btn-add-weak');
+      clearError();
+      showView('setup');
+    };
+    if (activity) { archiveCurrent(reset); }
+    else { reset(); }
   }
 
   function onReshuffle() {
@@ -287,11 +291,104 @@
     renderMatchView();
   }
 
+  /* ---------- 历史球局 ---------- */
+  function fmtDate(d) {
+    var s = String(d);
+    return (s.length === 8 ? parseInt(s.slice(4, 6), 10) + '月' + parseInt(s.slice(6, 8), 10) + '日' : s);
+  }
+
+  function onShowHistory() {
+    renderHistoryList();
+    showView('history');
+  }
+
+  function renderHistoryList() {
+    var listEl = $('history-list');
+    listEl.innerHTML = '';
+    var done = function (list) {
+      if (!list || !list.length) {
+        var empty = document.createElement('div');
+        empty.className = 'item';
+        empty.textContent = '暂无历史球局';
+        listEl.appendChild(empty);
+        return;
+      }
+      list.forEach(function (h) {
+        var row = document.createElement('div');
+        row.className = 'item history-row';
+        row.textContent = '🗓️ ' + fmtDate(h.date) + ' ' + (h.id.indexOf('-') > 0 ? h.id.split('-')[1] : '') + ' · ' + h.matchCount + '场 · ' + (h.complete ? '已完成' : '进行中');
+        (function (id) {
+          row.addEventListener('click', function () { onHistorySelect(id); });
+        })(h.id);
+        listEl.appendChild(row);
+      });
+    };
+    if (BadRot.cloud.isEnabled()) { BadRot.cloud.fetchActivities(done); }
+    else { done(BadRot.storage.loadHistory()); }
+  }
+
+  function onHistorySelect(id) {
+    var show = function (act) {
+      if (!act || !act.schedule) { toast('球局不存在'); return; }
+      renderHistoryDetail(act, id);
+      showView('history-detail');
+    };
+    if (BadRot.cloud.isEnabled()) { BadRot.cloud.fetchActivityById(id, show); }
+    else { show(BadRot.storage.loadHistoryById(id)); }
+  }
+
+  function renderHistoryDetail(act, id) {
+    $('history-detail-title').textContent = '🗓️ 球局 ' + id;
+    var roster = $('history-roster');
+    roster.innerHTML = '';
+    var line = document.createElement('div');
+    line.className = 'item';
+    line.textContent = '强组：' + act.strong.join('、') + '　弱组：' + act.weak.join('、');
+    roster.appendChild(line);
+
+    var scores = $('history-scores');
+    scores.innerHTML = '';
+    act.schedule.forEach(function (m, i) {
+      var item = document.createElement('div');
+      item.className = 'item';
+      var r = m.result;
+      item.textContent = '第 ' + (i + 1) + ' 场：' + teamLabel(m.teamA) + ' vs ' + teamLabel(m.teamB) +
+        (r ? ' → ' + r.scoreA + ':' + r.scoreB + (r.scoreA > r.scoreB ? ' ✅' : '') : '（未打）');
+      scores.appendChild(item);
+    });
+
+    var standings = BadRot.ranking.computeStandings(act.strong, act.weak, act.schedule);
+    var list = $('history-standings');
+    list.innerHTML = '';
+    standings.forEach(function (r, i) {
+      var li = document.createElement('li');
+      li.textContent = (i + 1) + '. ' + r.name + ' ' + r.points + '分 · ' + r.wins + '胜' + r.played + '场 · 净胜' + (r.net >= 0 ? '+' : '') + r.net;
+      list.appendChild(li);
+    });
+  }
+
+  function onHistoryBack() { showView('setup'); }
+  function onHistoryDetailBack() { renderHistoryList(); showView('history'); }
+
   /* ---------- 云同步 ---------- */
   function saveActivity() {
     activity.updatedAt = Date.now();
     BadRot.storage.save(activity);
     BadRot.cloud.pushActivity(activity); // 未连接时内部静默跳过
+  }
+
+  // 存档当前活动为历史球局：服务器优先，失败时提示；无后端时降级本地
+  function archiveCurrent(stepNext) {
+    var act = activity;
+    if (BadRot.cloud.isEnabled()) {
+      BadRot.cloud.archiveActivity(act, function (res) {
+        if (res && res.ok) { stepNext(); }
+        else { toast('历史存档失败，请检查网络后重试'); }
+      });
+    } else {
+      BadRot.storage.saveHistory(act);
+      stepNext();
+    }
   }
 
   function applyView() {
@@ -341,6 +438,9 @@
     $('btn-copy-text').addEventListener('click', onCopyText);
     $('btn-rematch').addEventListener('click', onRematch);
     $('btn-reshuffle').addEventListener('click', onReshuffle);
+    $('btn-show-history').addEventListener('click', onShowHistory);
+    $('btn-history-back').addEventListener('click', onHistoryBack);
+    $('btn-history-detail-back').addEventListener('click', onHistoryDetailBack);
 
     var saved = BadRot.storage.load();
     if (saved && saved.schedule && saved.schedule.length >= 3) {

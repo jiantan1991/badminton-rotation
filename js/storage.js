@@ -64,6 +64,62 @@
 
   function setImpl(mock) { impl = mock; }
 
+  // ---- 本地历史（无后端降级：数据存 localStorage）----
+  var HISTORY_KEY = 'badminton_history';
+  var MAX_HISTORY = 200;
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  function loadHistory() {
+    var s = storage();
+    if (!s) return [];
+    var raw = s.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    try {
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveHistory(activity) {
+    var s = storage();
+    if (!s || !activity || !Array.isArray(activity.schedule)) return null;
+    var arr = loadHistory();
+    var now = new Date();
+    var id = now.getFullYear() + pad2(now.getMonth() + 1) + pad2(now.getDate()) + '-' +
+      pad2(now.getHours()) + pad2(now.getMinutes());
+    var base = id, n = 2;
+    while (s.getItem(HISTORY_KEY + '_' + id)) { id = base + '-' + n; n++; }
+    var meta = {
+      id: id,
+      date: id.slice(0, 8),
+      matchCount: activity.schedule.length,
+      complete: activity.schedule.every(function (m) { return !!m && !!m.result; })
+    };
+    arr.push(meta);
+    while (arr.length > MAX_HISTORY) { // 超上限删最旧（连带明细键，避免孤儿数据残留）
+      var dropped = arr.shift();
+      if (dropped && dropped.id) s.removeItem(HISTORY_KEY + '_' + dropped.id);
+    }
+    s.setItem(HISTORY_KEY, JSON.stringify(arr));
+    s.setItem(HISTORY_KEY + '_' + id, JSON.stringify(activity));
+    return meta;
+  }
+
+  function loadHistoryById(id) {
+    var s = storage();
+    if (!s || !id) return null;
+    var raw = s.getItem(HISTORY_KEY + '_' + id);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
   var Storage = {
     KEY: KEY,
     save: save,
@@ -71,6 +127,9 @@
     clear: clear,
     exportText: exportText,
     importText: importText,
+    loadHistory: loadHistory,
+    saveHistory: saveHistory,
+    loadHistoryById: loadHistoryById,
     _setImpl: setImpl
   };
   if (typeof module !== 'undefined' && module.exports) { module.exports = Storage; }

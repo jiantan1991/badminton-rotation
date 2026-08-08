@@ -38,7 +38,10 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
 .vs { font-size: 24px; color: #999; margin: 0 18px; }
 .preview { background: #fff; border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
 .preview summary { cursor: pointer; color: #555; }
+.preview-head { color: #555; font-size: 14px; margin-bottom: 6px; }
 .preview .item { padding: 6px 0; border-bottom: 1px dashed #eee; color: #666; }
+.history-row { cursor: pointer; }
+.history-row:active { background: #f5f5f5; }
 .standings { list-style: none; counter-reset: rank; background: #fff; border-radius: 14px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
 .standings li { display: flex; justify-content: space-between; padding: 12px 8px; border-bottom: 1px solid #f0f0f0; font-size: 16px; }
 .standings li:last-child { border-bottom: none; }
@@ -79,6 +82,7 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
     </div>
     <p id="setup-error" class="error" hidden></p>
     <button type="button" class="btn primary big" id="btn-generate">生成轮转表</button>
+    <button type="button" class="btn ghost" id="btn-show-history">📋 历史球局</button>
   </section>
 
   <!-- ② 轮转表页 -->
@@ -102,6 +106,11 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
     <p id="score-error" class="error" hidden></p>
     <button type="button" class="btn primary big" id="btn-submit-score">提交比分</button>
     <button type="button" class="btn ghost" id="btn-finish-early">提前结束</button>
+    <div class="preview">
+      <div class="preview-head">📋 已打完场次（点比分可修改）</div>
+      <div id="match-history"></div>
+      <button type="button" class="btn tiny" id="btn-back-progress" hidden>⬅ 返回当前进度</button>
+    </div>
     <details class="preview">
       <summary>后续场次预览</summary>
       <div id="later-matches"></div>
@@ -118,6 +127,32 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
     <div class="result-actions">
       <button type="button" class="btn ghost" id="btn-rematch">再来一局</button>
       <button type="button" class="btn ghost" id="btn-reshuffle">重新轮转</button>
+    </div>
+  </section>
+
+  <!-- ④ 历史列表页 -->
+  <section id="view-history" class="view" data-view="history" hidden>
+    <div class="topbar">
+      <button type="button" class="btn tiny" id="btn-history-back">⬅ 返回</button>
+      <span>📋 历史球局</span>
+    </div>
+    <div class="preview" id="history-list"></div>
+  </section>
+
+  <!-- ⑤ 历史详情页 -->
+  <section id="view-history-detail" class="view" data-view="history-detail" hidden>
+    <div class="topbar">
+      <button type="button" class="btn tiny" id="btn-history-detail-back">⬅ 返回列表</button>
+      <span id="history-detail-title">🗓️ 球局</span>
+    </div>
+    <div class="preview" id="history-roster"></div>
+    <div class="preview">
+      <div class="preview-head">每场比分</div>
+      <div id="history-scores"></div>
+    </div>
+    <div class="preview">
+      <div class="preview-head">最终排名</div>
+      <ol class="standings" id="history-standings"></ol>
     </div>
   </section>
 
@@ -179,11 +214,51 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
       .catch(function () { cb(false); });
   }
 
+  // 归档活动到历史球局（成功 → cb(data)，失败 → cb(null)）
+  function archiveActivity(activity, cb) {
+    cb = cb || function () {};
+    if (!enabled) { cb(null); return; }
+    global.fetch(CONFIG.apiBase.replace('/activity', '/archive'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(activity)
+    })
+      .then(function (resp) { return resp.json(); })
+      .then(function (data) { cb(data); })
+      .catch(function () { cb(null); });
+  }
+
+  // 拉取全部历史球局（无数据/失败 → cb([])）
+  function fetchActivities(cb) {
+    cb = cb || function () {};
+    if (!enabled) { cb([]); return; }
+    global.fetch(CONFIG.apiBase.replace('/activity', '/activities'))
+      .then(function (resp) { return resp.json(); })
+      .then(function (list) { cb(Array.isArray(list) ? list : []); })
+      .catch(function () { cb([]); });
+  }
+
+  // 按 id 拉取单个历史球局（无数据/失败 → cb(null)）
+  function fetchActivityById(id, cb) {
+    cb = cb || function () {};
+    if (!enabled) { cb(null); return; }
+    global.fetch(CONFIG.apiBase.replace('/activity', '/activities/') + id)
+      .then(function (resp) {
+        if (resp.status !== 200) { cb(null); return; }
+        return resp.json();
+      })
+      .then(function (data) { cb(data || null); })
+      .catch(function () { cb(null); });
+  }
+
   global.BadRot = global.BadRot || {};
   global.BadRot.cloud = {
     init: init,
     fetchActivity: fetchActivity,
     pushActivity: pushActivity,
+    archiveActivity: archiveActivity,
+    fetchActivities: fetchActivities,
+    fetchActivityById: fetchActivityById,
     isEnabled: isEnabled,
     CONFIG: CONFIG
   };
@@ -507,6 +582,62 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
 
   function setImpl(mock) { impl = mock; }
 
+  // ---- 本地历史（无后端降级：数据存 localStorage）----
+  var HISTORY_KEY = 'badminton_history';
+  var MAX_HISTORY = 200;
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  function loadHistory() {
+    var s = storage();
+    if (!s) return [];
+    var raw = s.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    try {
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveHistory(activity) {
+    var s = storage();
+    if (!s || !activity || !Array.isArray(activity.schedule)) return null;
+    var arr = loadHistory();
+    var now = new Date();
+    var id = now.getFullYear() + pad2(now.getMonth() + 1) + pad2(now.getDate()) + '-' +
+      pad2(now.getHours()) + pad2(now.getMinutes());
+    var base = id, n = 2;
+    while (s.getItem(HISTORY_KEY + '_' + id)) { id = base + '-' + n; n++; }
+    var meta = {
+      id: id,
+      date: id,
+      matchCount: activity.schedule.length,
+      complete: activity.schedule.every(function (m) { return !!m && !!m.result; })
+    };
+    arr.push(meta);
+    while (arr.length > MAX_HISTORY) { // 超上限删最旧（连带明细键，避免孤儿数据残留）
+      var dropped = arr.shift();
+      if (dropped && dropped.id) s.removeItem(HISTORY_KEY + '_' + dropped.id);
+    }
+    s.setItem(HISTORY_KEY, JSON.stringify(arr));
+    s.setItem(HISTORY_KEY + '_' + id, JSON.stringify(activity));
+    return meta;
+  }
+
+  function loadHistoryById(id) {
+    var s = storage();
+    if (!s || !id) return null;
+    var raw = s.getItem(HISTORY_KEY + '_' + id);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
   var Storage = {
     KEY: KEY,
     save: save,
@@ -514,6 +645,9 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
     clear: clear,
     exportText: exportText,
     importText: importText,
+    loadHistory: loadHistory,
+    saveHistory: saveHistory,
+    loadHistoryById: loadHistoryById,
     _setImpl: setImpl
   };
   if (typeof module !== 'undefined' && module.exports) { module.exports = Storage; }
@@ -606,6 +740,7 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
   var $ = function (id) { return document.getElementById(id); };
 
   var activity = null; // { strong, weak, schedule, currentIndex }
+  var viewIndex = 0;   // 当前显示/编辑的场次（查看历史时与 currentIndex 不同）
 
   /* ---------- 视图切换 ---------- */
   function showView(name) {
@@ -684,6 +819,7 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
       schedule: BadRot.rotation.generateSchedule(strong, weak, numMatches),
       currentIndex: 0
     };
+    viewIndex = 0;
     saveActivity();
     renderMatchView();
     showView('match');
@@ -725,8 +861,8 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
   }
 
   function renderMatchView() {
-    var m = activity.schedule[activity.currentIndex];
-    var progress = '第 ' + (activity.currentIndex + 1) + '/' + activity.schedule.length + ' 场';
+    var m = activity.schedule[viewIndex];
+    var progress = '第 ' + (viewIndex + 1) + '/' + activity.schedule.length + ' 场';
     $('match-progress').textContent = progress;
 
     var card = $('current-match');
@@ -744,10 +880,32 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
     scoreA.value = m.result ? m.result.scoreA : '';
     scoreB.value = m.result ? m.result.scoreB : '';
 
+    // 已打完场次列表（历史，点击可修改）
+    var hist = $('match-history');
+    hist.innerHTML = '';
+    for (var h = 0; h < activity.schedule.length; h++) {
+      if (h === viewIndex) continue;
+      var hm = activity.schedule[h];
+      if (!hm.result) continue;
+      var row = document.createElement('div');
+      row.className = 'item history-row';
+      row.textContent = '第 ' + (h + 1) + ' 场：' + teamLabel(hm.teamA) + ' ' + hm.result.scoreA + ':' + hm.result.scoreB + ' ' + teamLabel(hm.teamB) + ' ✏️';
+      (function (idx) {
+        row.addEventListener('click', function () {
+          viewIndex = idx;
+          renderMatchView();
+        });
+      })(h);
+      hist.appendChild(row);
+    }
+
+    // 返回当前进度按钮（正在查看/修改历史场次时显示）
+    $('btn-back-progress').hidden = viewIndex === activity.currentIndex;
+
     // 后续场次预览
     var later = $('later-matches');
     later.innerHTML = '';
-    for (var i = activity.currentIndex + 1; i < activity.schedule.length; i++) {
+    for (var i = viewIndex + 1; i < activity.schedule.length; i++) {
       var lm = activity.schedule[i];
       var item = document.createElement('div');
       item.className = 'item';
@@ -774,16 +932,25 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
       err.hidden = false; return;
     }
     err.hidden = true;
-    var m = activity.schedule[activity.currentIndex];
+    var m = activity.schedule[viewIndex];
+    var wasResult = !!m.result;
     m.result = { scoreA: a, scoreB: b };
     saveActivity();
 
-    if (activity.currentIndex + 1 >= activity.schedule.length) {
-      renderResultView();
-      showView('result');
+    if (!wasResult && viewIndex === activity.currentIndex) {
+      // 正常打完一场 → 推进
+      if (viewIndex + 1 >= activity.schedule.length) {
+        renderResultView();
+        showView('result');
+      } else {
+        activity.currentIndex += 1;
+        viewIndex = activity.currentIndex;
+        saveActivity();
+        renderMatchView();
+      }
     } else {
-      activity.currentIndex += 1;
-      saveActivity();
+      // 修改已打过的比分 → 覆盖不推进
+      toast('比分已修改');
       renderMatchView();
     }
   }
@@ -834,27 +1001,131 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
   }
 
   function onRematch() {
-    BadRot.storage.clear();
-    activity = null;
-    buildNameInputs('strong-inputs', defaultInputs(), 'btn-add-strong');
-    buildNameInputs('weak-inputs', defaultInputs(), 'btn-add-weak');
-    clearError();
-    showView('setup');
+    var reset = function () {
+      BadRot.storage.clear();
+      activity = null;
+      viewIndex = 0;
+      buildNameInputs('strong-inputs', defaultInputs(), 'btn-add-strong');
+      buildNameInputs('weak-inputs', defaultInputs(), 'btn-add-weak');
+      clearError();
+      showView('setup');
+    };
+    if (activity) { archiveCurrent(reset); }
+    else { reset(); }
   }
 
   function onReshuffle() {
     activity.schedule = BadRot.rotation.generateSchedule(activity.strong, activity.weak, activity.schedule.length);
     activity.currentIndex = 0;
+    viewIndex = 0;
     saveActivity();
     renderMatchView();
     showView('match');
   }
+
+  function onBackProgress() {
+    viewIndex = activity.currentIndex;
+    renderMatchView();
+  }
+
+  /* ---------- 历史球局 ---------- */
+  function fmtDate(d) {
+    var s = String(d);
+    return (s.length === 8 ? parseInt(s.slice(4, 6), 10) + '月' + parseInt(s.slice(6, 8), 10) + '日' : s);
+  }
+
+  function onShowHistory() {
+    renderHistoryList();
+    showView('history');
+  }
+
+  function renderHistoryList() {
+    var listEl = $('history-list');
+    listEl.innerHTML = '';
+    var done = function (list) {
+      if (!list || !list.length) {
+        var empty = document.createElement('div');
+        empty.className = 'item';
+        empty.textContent = '暂无历史球局';
+        listEl.appendChild(empty);
+        return;
+      }
+      list.forEach(function (h) {
+        var row = document.createElement('div');
+        row.className = 'item history-row';
+        row.textContent = '🗓️ ' + fmtDate(h.date) + ' ' + (h.id.indexOf('-') > 0 ? h.id.split('-')[1] : '') + ' · ' + h.matchCount + '场 · ' + (h.complete ? '已完成' : '进行中');
+        (function (id) {
+          row.addEventListener('click', function () { onHistorySelect(id); });
+        })(h.id);
+        listEl.appendChild(row);
+      });
+    };
+    if (BadRot.cloud.isEnabled()) { BadRot.cloud.fetchActivities(done); }
+    else { done(BadRot.storage.loadHistory()); }
+  }
+
+  function onHistorySelect(id) {
+    var show = function (act) {
+      if (!act || !act.schedule) { toast('球局不存在'); return; }
+      renderHistoryDetail(act, id);
+      showView('history-detail');
+    };
+    if (BadRot.cloud.isEnabled()) { BadRot.cloud.fetchActivityById(id, show); }
+    else { show(BadRot.storage.loadHistoryById(id)); }
+  }
+
+  function renderHistoryDetail(act, id) {
+    $('history-detail-title').textContent = '🗓️ 球局 ' + id;
+    var roster = $('history-roster');
+    roster.innerHTML = '';
+    var line = document.createElement('div');
+    line.className = 'item';
+    line.textContent = '强组：' + act.strong.join('、') + '　弱组：' + act.weak.join('、');
+    roster.appendChild(line);
+
+    var scores = $('history-scores');
+    scores.innerHTML = '';
+    act.schedule.forEach(function (m, i) {
+      var item = document.createElement('div');
+      item.className = 'item';
+      var r = m.result;
+      item.textContent = '第 ' + (i + 1) + ' 场：' + teamLabel(m.teamA) + ' vs ' + teamLabel(m.teamB) +
+        (r ? ' → ' + r.scoreA + ':' + r.scoreB + (r.scoreA > r.scoreB ? ' ✅' : '') : '（未打）');
+      scores.appendChild(item);
+    });
+
+    var standings = BadRot.ranking.computeStandings(act.strong, act.weak, act.schedule);
+    var list = $('history-standings');
+    list.innerHTML = '';
+    standings.forEach(function (r, i) {
+      var li = document.createElement('li');
+      li.textContent = (i + 1) + '. ' + r.name + ' ' + r.points + '分 · ' + r.wins + '胜' + r.played + '场 · 净胜' + (r.net >= 0 ? '+' : '') + r.net;
+      list.appendChild(li);
+    });
+  }
+
+  function onHistoryBack() { showView('setup'); }
+  function onHistoryDetailBack() { renderHistoryList(); showView('history'); }
 
   /* ---------- 云同步 ---------- */
   function saveActivity() {
     activity.updatedAt = Date.now();
     BadRot.storage.save(activity);
     BadRot.cloud.pushActivity(activity); // 未连接时内部静默跳过
+  }
+
+  // 存档当前活动为历史球局：服务器优先，失败时提示；无后端时降级本地
+  function archiveCurrent(stepNext) {
+    var act = activity;
+    if (BadRot.cloud.isEnabled()) {
+      BadRot.cloud.archiveActivity(act, function (res) {
+        if (res && res.ok) { stepNext(); }
+        else { toast('历史存档失败，请检查网络后重试'); }
+      });
+    } else {
+      BadRot.storage.saveHistory(act);
+      stepNext();
+    }
   }
 
   function applyView() {
@@ -882,6 +1153,7 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
           (!cloudAct.updatedAt || activity.updatedAt >= cloudAct.updatedAt);
         if (localNewer) return;
         activity = cloudAct;
+        viewIndex = activity.currentIndex;
         BadRot.storage.save(activity);
         var view = getCurrentView();
         if (view === 'match') renderMatchView();
@@ -898,14 +1170,19 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
     $('btn-submit-score').addEventListener('click', onSubmitScore);
     $('btn-finish-early').addEventListener('click', onFinishEarly);
     $('btn-standings').addEventListener('click', onShowStandings);
+    $('btn-back-progress').addEventListener('click', onBackProgress);
     $('btn-share-image').addEventListener('click', onShareImage);
     $('btn-copy-text').addEventListener('click', onCopyText);
     $('btn-rematch').addEventListener('click', onRematch);
     $('btn-reshuffle').addEventListener('click', onReshuffle);
+    $('btn-show-history').addEventListener('click', onShowHistory);
+    $('btn-history-back').addEventListener('click', onHistoryBack);
+    $('btn-history-detail-back').addEventListener('click', onHistoryDetailBack);
 
     var saved = BadRot.storage.load();
     if (saved && saved.schedule && saved.schedule.length >= 3) {
       activity = saved;
+      viewIndex = activity.currentIndex;
       applyView();
     } else {
       showView('setup');
@@ -926,6 +1203,7 @@ h2 { font-size: 16px; margin: 10px 0 6px; }
             (cloudAct.updatedAt && cloudAct.updatedAt > activity.updatedAt);
           if (cloudNewer) {
             activity = cloudAct;
+            viewIndex = activity.currentIndex;
             BadRot.storage.save(activity);
             applyView();
           }

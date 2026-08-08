@@ -18,6 +18,7 @@
 import json
 import os
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
@@ -25,6 +26,67 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE, 'static')
 DATA_DIR = os.path.join(BASE, 'data')
 DATA_FILE = os.path.join(DATA_DIR, 'activity.json')
+ACTIVITIES_DIR = os.path.join(DATA_DIR, 'activities')
+MAX_HISTORY = 200
+
+
+def list_activities():
+    """返回历史球局列表（时间倒序），每项 {id, date, matchCount, complete}。"""
+    if not os.path.isdir(ACTIVITIES_DIR):
+        return []
+    items = []
+    for name in os.listdir(ACTIVITIES_DIR):
+        if not name.endswith('.json'):
+            continue
+        sid = name[:-len('.json')]
+        try:
+            with open(os.path.join(ACTIVITIES_DIR, name), encoding='utf-8') as f:
+                activity = json.load(f)
+        except (ValueError, OSError):
+            continue  # 损坏文件跳过
+        schedule = activity.get('schedule') or []
+        items.append({
+            'id': sid,
+            'date': sid[:8],
+            'matchCount': len(schedule),
+            'complete': all(m.get('result') for m in schedule),
+        })
+    items.sort(key=lambda x: x['id'], reverse=True)
+    return items[:MAX_HISTORY]
+
+
+def archive_activity(activity):
+    """存档活动到 ACTIVITIES_DIR，超过 MAX_HISTORY 时淘汰最旧的，返回存档 id。"""
+    base = time.strftime('%Y%m%d-%H%M')
+    sid = base
+    n = 2
+    while os.path.exists(os.path.join(ACTIVITIES_DIR, sid + '.json')):
+        sid = '%s-%d' % (base, n)
+        n += 1
+    os.makedirs(ACTIVITIES_DIR, exist_ok=True)
+    with open(os.path.join(ACTIVITIES_DIR, sid + '.json'), 'w', encoding='utf-8') as f:
+        json.dump(activity, f, ensure_ascii=False)
+    # 淘汰：按 id 时间序删除最旧的（同分钟内 -N 后缀需按数字比较，
+    # 否则 "-10" 会排到 "-2" 前面，导致刚写入的文件被误删）。
+    # 同时保护刚写入的存档：id 复用/排序可能让它排在最前，不能自删。
+    def _sort_key(name):
+        stem = name[:-len('.json')]
+        parts = stem.split('-')
+        if len(parts) == 3 and parts[2].isdigit():
+            return (parts[0] + '-' + parts[1], int(parts[2]))
+        return (stem, 0)
+
+    files = sorted((f for f in os.listdir(ACTIVITIES_DIR) if f.endswith('.json')),
+                   key=_sort_key)
+    excess = len(files) - MAX_HISTORY
+    for name in files:
+        if excess <= 0:
+            break
+        if name == sid + '.json':
+            continue
+        os.remove(os.path.join(ACTIVITIES_DIR, name))
+        excess -= 1
+    return sid
 
 CONTENT_TYPES = {
     '.html': 'text/html',
@@ -67,6 +129,18 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send(200, 'null')
             return
+        if path == '/api/activities':
+            self._send(200, json.dumps(list_activities(), ensure_ascii=False))
+            return
+        if path.startswith('/api/activities/'):
+            sid = path[len('/api/activities/'):]
+            file_path = os.path.join(ACTIVITIES_DIR, sid + '.json')
+            if not os.path.isfile(file_path):
+                self._send(404, '{"ok":false,"msg":"not found"}')
+                return
+            with open(file_path, encoding='utf-8') as f:
+                self._send(200, f.read())
+            return
         # 静态文件
         if path == '/':
             path = '/index.html'
@@ -82,6 +156,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if urlparse(self.path).path != '/api/activity':
+            # /api/archive 存档接口
+            if urlparse(self.path).path == '/api/archive':
+                length = int(self.headers.get('Content-Length', 0) or 0)
+                body = self.rfile.read(length).decode('utf-8', errors='replace')
+                try:
+                    activity = json.loads(body)
+                except ValueError:
+                    self._send(400, '{"ok":false,"msg":"invalid json"}')
+                    return
+                sid = archive_activity(activity)
+                self._send(200, '{"ok":true,"id":"%s"}' % sid)
+                return
             self._send(404, 'Not Found', 'text/plain')
             return
         length = int(self.headers.get('Content-Length', 0) or 0)

@@ -33,6 +33,7 @@
     </div>
     <p id="setup-error" class="error" hidden></p>
     <button type="button" class="btn primary big" id="btn-generate">生成轮转表</button>
+    <button type="button" class="btn ghost" id="btn-show-history">📋 历史球局</button>
   </section>
 
   <!-- ② 轮转表页 -->
@@ -77,6 +78,32 @@
     <div class="result-actions">
       <button type="button" class="btn ghost" id="btn-rematch">再来一局</button>
       <button type="button" class="btn ghost" id="btn-reshuffle">重新轮转</button>
+    </div>
+  </section>
+
+  <!-- ④ 历史列表页 -->
+  <section id="view-history" class="view" data-view="history" hidden>
+    <div class="topbar">
+      <button type="button" class="btn tiny" id="btn-history-back">⬅ 返回</button>
+      <span>📋 历史球局</span>
+    </div>
+    <div class="preview" id="history-list"></div>
+  </section>
+
+  <!-- ⑤ 历史详情页 -->
+  <section id="view-history-detail" class="view" data-view="history-detail" hidden>
+    <div class="topbar">
+      <button type="button" class="btn tiny" id="btn-history-detail-back">⬅ 返回列表</button>
+      <span id="history-detail-title">🗓️ 球局</span>
+    </div>
+    <div class="preview" id="history-roster"></div>
+    <div class="preview">
+      <div class="preview-head">每场比分</div>
+      <div id="history-scores"></div>
+    </div>
+    <div class="preview">
+      <div class="preview-head">最终排名</div>
+      <ol class="standings" id="history-standings"></ol>
     </div>
   </section>
 
