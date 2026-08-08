@@ -131,6 +131,27 @@ const W = ['弱1', '弱2', '弱3'];
   }
 }
 
+// ---- 严格"打2休1"节奏：每人的休息场次模 3 必须全部一致（打打休 循环）----
+function assertStrictRestPattern(sched) {
+  const rests = {};
+  sched.forEach(m => m.resting.forEach(p => { (rests[p.name] = rests[p.name] || []).push(m.id); }));
+  for (const name of Object.keys(rests)) {
+    const mods = rests[name].map(id => id % 3);
+    assert.ok(new Set(mods).size === 1,
+      name + ' 休息场次应严格模3一致（打2休1），实际休场: ' + rests[name].join(','));
+    assert.strictEqual(rests[name].length, Math.floor(sched.length / 3), name + ' 休息次数应为 N/3');
+  }
+}
+{
+  for (const n of [12, 15, 18, 21]) {
+    const sched = Rotation.generateSchedule(S, W, n);
+    assertStrictRestPattern(sched);
+  }
+  assertStrictRestPattern(Rotation.generateSchedule(['强1', '强2'], ['弱1', '弱2', '弱3', '弱4'], 12));
+  assertStrictRestPattern(Rotation.generateSchedule(['强1', '强2', '强3', '强4'], ['弱1', '弱2'], 12));
+  assertStrictRestPattern(Rotation.generateSchedule(S, W, 3));
+}
+
 // ---- 非法输入 ----
 assert.throws(() => Rotation.generateSchedule(['a'], ['b', 'c', 'd', 'e', 'f'], 12), /强组需 2~4 人/, '强组 1 人应抛错');
 assert.throws(() => Rotation.generateSchedule(['a', 'b'], ['c', 'd'], 12), /总人数必须为 6/, '总人数非 6 应抛错');
