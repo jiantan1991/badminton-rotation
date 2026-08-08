@@ -7,6 +7,26 @@
 
 **https://jiantan1991.github.io/badminton-rotation/**（GitHub Pages，微信可直接打开）
 
+## 云服务器部署（推荐：数据云端共享）
+
+部署到云服务器后，**任何设备打开都是同一份数据**（数据存服务器，不怕清缓存/换手机）：
+
+```bash
+# 1. 本机准备部署包
+python build_server.py        # 生成 server/ 目录（含前端 + server.py）
+
+# 2. 上传 server/ 目录到云服务器（如 /opt/badminton/）
+
+# 3. 服务器上启动（端口 8080）
+cd /opt/badminton/server
+python3 server.py 8080
+```
+
+- 微信访问 `http://<服务器IP>:8080`
+- 数据自动存到服务器 `data/activity.json`，任何设备读写同一份
+- 未部署后端时（GitHub Pages 版）自动降级为本地存储模式
+- 建议配合 systemd / nohup 保持后台运行（见 server.py 注释）
+
 ## 使用
 
 1. 打开页面，强组/弱组各填 2~4 人姓名（共 6 人），组内按实力从强到弱填
@@ -42,8 +62,8 @@ node tests/storage.test.js
 
 ## 说明
 
-- 纯静态页面，无后端；数据存浏览器 localStorage（记录员手机），
-  群友查看排名请用"生成排名图"分享
-- 支持 3强3弱 / 2强4弱 / 4强2弱 三种人数分布；场数自定义（3~30，默认 12），
+- 支持 3强3弱 / 2强4弱 / 4强2弱 三种人数分布；场数可选 12/15/18/21（默认 12），
   每人上场次数完全一致（如 12 场时每人恰好 8 场），严格"打 2 休 1"节奏，
   每队优先 1强1弱，搭档/对阵尽量分散
+- 数据存储：部署到云服务器 → 数据存服务器（任何设备同一份）；
+  GitHub Pages 版 → 数据存手机 localStorage + 备份文本找回

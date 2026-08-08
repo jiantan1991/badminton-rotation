@@ -1,0 +1,3 @@
+# 部署生成物（build_server.py 生成，部署时重新生成）
+server/static/
+server/data/
