@@ -371,6 +371,22 @@
   function onHistoryDetailBack() { renderHistoryList(); showView('history'); }
 
   /* ---------- 云同步 ---------- */
+  var archivedThisSession = {}; // 按 updatedAt 去重，避免同一完赛活动重复存档
+
+  // 完赛活动：自动存档为历史球局并显示新球局页面（设置页）
+  function autoArchiveComplete(act) {
+    var key = act.updatedAt || 'x';
+    if (archivedThisSession[key]) return;
+    archivedThisSession[key] = true;
+    activity = act;
+    archiveCurrent(function () {
+      BadRot.storage.clear();
+      activity = null;
+      viewIndex = 0;
+    });
+    showView('setup');
+  }
+
   function saveActivity() {
     activity.updatedAt = Date.now();
     BadRot.storage.save(activity);
@@ -415,6 +431,10 @@
         var localNewer = activity.updatedAt &&
           (!cloudAct.updatedAt || activity.updatedAt >= cloudAct.updatedAt);
         if (localNewer) return;
+        if (BadRot.ranking.isComplete(cloudAct.schedule)) {
+          autoArchiveComplete(cloudAct); // 云端完赛：自动存档 + 新球局页面（不弹结果页）
+          return;
+        }
         activity = cloudAct;
         viewIndex = activity.currentIndex;
         BadRot.storage.save(activity);
@@ -444,9 +464,13 @@
 
     var saved = BadRot.storage.load();
     if (saved && saved.schedule && saved.schedule.length >= 3) {
-      activity = saved;
-      viewIndex = activity.currentIndex;
-      applyView();
+      if (BadRot.ranking.isComplete(saved.schedule)) {
+        autoArchiveComplete(saved); // 已完赛：自动存档 + 显示新球局页面
+      } else {
+        activity = saved;
+        viewIndex = activity.currentIndex;
+        applyView();
+      }
     } else {
       showView('setup');
     }
@@ -465,10 +489,14 @@
           var cloudNewer = !activity || !activity.updatedAt ||
             (cloudAct.updatedAt && cloudAct.updatedAt > activity.updatedAt);
           if (cloudNewer) {
-            activity = cloudAct;
-            viewIndex = activity.currentIndex;
-            BadRot.storage.save(activity);
-            applyView();
+            if (BadRot.ranking.isComplete(cloudAct.schedule)) {
+              autoArchiveComplete(cloudAct); // 云端完赛活动：自动存档 + 新球局页面
+            } else {
+              activity = cloudAct;
+              viewIndex = activity.currentIndex;
+              BadRot.storage.save(activity);
+              applyView();
+            }
           }
         } else if (activity) {
           saveActivity(); // 云端为空、本地有数据 → 首次推送
